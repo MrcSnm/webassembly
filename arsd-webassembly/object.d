@@ -663,10 +663,19 @@ class TypeInfo_Class : TypeInfo
 	void* destructor;
 	void function(Object) classInvariant;
 	uint flags;
+    static if(__VERSION__ >= 2109)
+    {
+        ushort depth;
+    }
 	void* deallocator;
 	OffsetTypeInfo[] m_offTi;
 	void function(Object) defaultConstructor;
 	immutable(void)* rtInfo;
+
+    static if(__VERSION__ >= 2109)
+    {
+        uint[4] nameSig;
+    }
 
 	override @property size_t size() nothrow pure const
     { return Object.sizeof; }
@@ -1289,50 +1298,81 @@ else static if(__VERSION__ >= 2105)
 }
 
 
-
-private void[] _d_newarrayOpT(alias op)(const TypeInfo ti, size_t[] dimensions)
+static if(__VERSION__ < 2109)
 {
-    if (dimensions.length == 0)
-        return null;
-
-    void[] foo(const TypeInfo ti, size_t[] dimensions)
+    private void[] _d_newarrayOpT(alias op)(const TypeInfo ti, size_t[] dimensions)
     {
-        size_t count = dimensions[0];
+        if (dimensions.length == 0)
+            return null;
 
-        if (dimensions.length == 1)
+        void[] foo(const TypeInfo ti, size_t[] dimensions)
         {
-            auto r = op(ti, count);
-            return (*cast(void[]*)(&r))[0..count];
-        }
-        void[] p = malloc((void[]).sizeof * count);
+            size_t count = dimensions[0];
 
-        foreach (i; 0..count)
-        {
-            (cast(void[]*)p.ptr)[i] = foo(ti.next, dimensions[1..$]);
+            if (dimensions.length == 1)
+            {
+                auto r = op(ti, count);
+                return (*cast(void[]*)(&r))[0..count];
+            }
+            void[] p = malloc((void[]).sizeof * count);
+
+            foreach (i; 0..count)
+            {
+                (cast(void[]*)p.ptr)[i] = foo(ti.next, dimensions[1..$]);
+            }
+            return p[0..count];
         }
-        return p[0..count];
+
+        return foo(ti, dimensions);
     }
 
-    return foo(ti, dimensions);
+    extern (C) void[] _d_newarraymTX(const TypeInfo ti, size_t[] dims)
+    {
+        if (dims.length == 0)
+            return null;
+        else
+            return _d_newarrayOpT!(_d_newarrayT)(ti, dims);
+    }
+
+    /// ditto
+    extern (C) void[] _d_newarraymiTX(const TypeInfo ti, size_t[] dims)
+    {
+        if (dims.length == 0)
+            return null;
+        else
+            return _d_newarrayOpT!(_d_newarrayiT)(ti, dims);
+    }
 }
-
-
-extern (C) void[] _d_newarraymTX(const TypeInfo ti, size_t[] dims)
+else
 {
-    if (dims.length == 0)
-        return null;
-    else
-        return _d_newarrayOpT!(_d_newarrayT)(ti, dims);
+    Tarr _d_newarraymTX(Tarr : U[], T, U)(size_t[] dims, bool isShared=false) @trusted
+    {
+        import std.traits:Unqual;
+        if (dims.length == 0)
+            return null;
+
+        void[] allocateInnerArray(size_t[] dimensions)
+        {
+            size_t count = dimensions[0];
+
+            if (dimensions.length == 1)
+            {
+                auto r = _d_newarrayT!(Unqual!T)(count, isShared);
+                return (*cast(void[]*)(&r))[0..count];
+            }
+            void[] p = malloc((void[]).sizeof * count);
+
+            foreach (i; 0..count)
+            {
+                (cast(void[]*)p.ptr)[i] = allocateInnerArray(dimensions[1..$]);
+            }
+            return p[0..count];
+        }
+        auto result = allocateInnerArray(dims);
+        return (cast(U*) result.ptr)[0 .. dims[0]];
+    }
 }
 
-/// ditto
-extern (C) void[] _d_newarraymiTX(const TypeInfo ti, size_t[] dims)
-{
-    if (dims.length == 0)
-        return null;
-    else
-        return _d_newarrayOpT!(_d_newarrayiT)(ti, dims);
-}
 
 
 template _d_arraysetlengthTImpl(Tarr : T[], T) {
