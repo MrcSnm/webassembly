@@ -255,6 +255,58 @@ extern(C) void* _d_dynamic_cast(Object o, TypeInfo_Class c) {
 	return res;
 }
 
+/*****
+ * Dynamic cast from a class object o to class c, where c is a subclass of o.
+ * Params:
+ *      o = instance of class
+ *      c = a subclass of o
+ * Returns:
+ *      null if o is null or c is not a subclass of o. Otherwise, return o.
+ */
+void* _d_class_cast(Object o, TypeInfo_Class c)
+{
+    if (!o)
+        return null;
+    
+    // Needed because ClassInfo.opEquals(Object) does a dynamic cast,
+    // but we are trying to implement dynamic cast.
+    static bool areClassInfosEqual(scope const TypeInfo_Class a, scope const TypeInfo_Class b) @safe
+    {
+        // same class if signatures match, works with potential duplicates across binaries
+        return a is b ||
+            (a.flags & 0x200 /*TypeInfo_Class.ClassFlags.hasNameSig*/
+            ? (a.nameSig[0] == b.nameSig[0] &&
+            a.nameSig[1] == b.nameSig[1])  // new fast way
+            : (a is b || a.name == b.name));  // old slow way for temporary binary compatibility
+    }
+
+
+    TypeInfo_Class oc = typeid(o);
+    int delta = oc.depth;
+
+    if (delta && c.depth)
+    {
+        delta -= c.depth;
+        if (delta < 0)
+            return null;
+
+        while (delta--)
+            oc = oc.base;
+        if (areClassInfosEqual(oc, c))
+            return cast(void*)o;
+        return null;
+    }
+
+    // no depth data - support the old way
+    do
+    {
+        if (areClassInfosEqual(oc, c))
+            return cast(void*)o;
+        oc = oc.base;
+    } while (oc);
+    return null;
+}
+
 /*************************************
  * Attempts to cast Object o to class c.
  * Returns o if successful, null if not.
@@ -662,7 +714,7 @@ class TypeInfo_Class : TypeInfo
 	TypeInfo_Class base;
 	void* destructor;
 	void function(Object) classInvariant;
-	uint flags;
+	ushort flags;
     static if(__VERSION__ >= 2109)
     {
         ushort depth;
