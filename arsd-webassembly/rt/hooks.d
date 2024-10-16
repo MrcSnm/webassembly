@@ -17,7 +17,7 @@ version(WebAssembly)
         Marks the memory block as OK to append in-place if possible.
     +/
     void assumeSafeAppend(T)(T[] arr) {
-        auto block = getAllocatedBlock(arr.ptr);
+        auto block= getAllocatedBlock(arr.ptr);
         if(block is null) assert(0);
 
         block.used = arr.length;
@@ -39,11 +39,19 @@ version(WebAssembly)
         block.flags |= AllocatedBlock.Flags.unique;
     }
 
+    AllocatedBlock* getAllocatedBlock(void* ptr) pure nothrow
+    {
+        auto block = (cast(AllocatedBlock*) ptr) - 1;
+        if(!block.checkChecksum())
+            return null;
+        return block;
+    }
+
 }
 else version(UsePSVMem)
 {
     enum MAGIC = ushort.max - 1;
-    package struct PSVMem
+    struct PSVMem
     {
         size_t size;
         ushort magicNumber = MAGIC;
@@ -54,13 +62,13 @@ else version(UsePSVMem)
         pragma(inline, true) static uint dataOffset() nothrow pure @nogc @trusted {return PSVMem.sizeof;}
     }
 
-    package bool isPSVMem(void* ptr) pure nothrow @nogc @trusted
+    bool isPSVMem(void* ptr) pure nothrow @nogc @trusted
     {
         if(cast(size_t)ptr <= PSVMem.dataOffset) return false;
         PSVMem mem = *cast(PSVMem*)(ptr - PSVMem.dataOffset);
         return mem.magicNumber == MAGIC;
     }
-    package void* getPSVMem(void* ptr) pure nothrow @nogc @trusted
+    void* getPSVMem(void* ptr) pure nothrow @nogc @trusted
     {
         if(ptr is null || !isPSVMem(ptr)) return null;
         return ptr - PSVMem.dataOffset;

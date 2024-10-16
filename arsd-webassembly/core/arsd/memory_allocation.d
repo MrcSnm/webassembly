@@ -264,10 +264,18 @@ version(WebAssembly)
 		return reallocMain(ptr, newSize, file, line);
 	}
 	pragma(inline, true)
-	ubyte[] pureRealloc(ubyte[] ptr, size_t newSize, string file = __FILE__, size_t line = __LINE__) pure @trusted 
+	ubyte[] pureRealloc(ubyte[] ptr, size_t newSize, string file = __FILE__, size_t line = __LINE__) pure @trusted nothrow
 	{
-		alias pRealloc = ubyte[] function (ubyte[], size_t, string file = __FILE__, size_t line = __LINE__) pure;
+		alias pRealloc = ubyte[] function (ubyte[], size_t, string file = __FILE__, size_t line = __LINE__) pure nothrow @trusted;
 		auto pureRealloc = cast(pRealloc)&reallocMain;
 		return pureRealloc(ptr,newSize,file,line);
+	}
+
+	pragma(inline, true)
+	ubyte[] pureMalloc(size_t size, string file = __FILE__, size_t line = __LINE__) pure @trusted nothrow
+	{
+		alias PureM = ubyte[] function(size_t sz, string file = __FILE__, size_t line = __LINE__) pure @trusted nothrow;
+		PureM pureMalloc = cast(PureM)&malloc;
+		return pureMalloc(size, file, line);
 	}
 }

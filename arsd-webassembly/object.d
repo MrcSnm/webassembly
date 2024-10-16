@@ -2115,7 +2115,7 @@ immutable(T)[] idup(T)(scope const(T)[] array) pure nothrow @trusted
 	return result;
 }
 
-class Error { this(string msg) {} }
+class Error { this(string msg) pure @trusted nothrow {} }
 class Throwable : Object
 {
     interface TraceInfo
