@@ -937,7 +937,7 @@ extern (C)
 
     AARange _aaRange(AA aa) pure nothrow @nogc @safe;
     bool _aaRangeEmpty(AARange r) pure @safe @nogc nothrow;
-    void* _aaRangeFrontKey(AARange r);
+    void* _aaRangeFrontKey(AARange r) pure @safe @nogc nothrow;
     void* _aaRangeFrontValue(AARange r) pure @nogc nothrow;
     void _aaRangePopFront(ref AARange r) pure @nogc nothrow @safe;
 
@@ -1305,14 +1305,14 @@ extern(C) void[] _d_newarrayiT(const TypeInfo ti, size_t length)
 	}
 }
 
-extern (C) void* _d_newitemU(scope const TypeInfo _ti)
+extern (C) void* _d_newitemU(scope const TypeInfo _ti) pure
 {
 	import core.arsd.objectutils;
     auto ti =  cast()_ti;
     immutable tiSize = structTypeInfoSize(ti);
     immutable itemSize = ti.size;
     immutable size = itemSize + tiSize;
-    auto p = malloc(size);
+    auto p = pureMalloc(size);
 
     return p.ptr;
 }
@@ -1339,7 +1339,7 @@ static if(__VERSION__ < 2105)
 }
 else static if(__VERSION__ >= 2105)
 {
-    T* _d_newitemT(T)() @trusted
+    T* _d_newitemT(T)() @trusted pure
     {
         TypeInfo _ti = typeid(T);
         auto p = _d_newitemU(_ti);
