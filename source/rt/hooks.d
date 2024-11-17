@@ -6,7 +6,6 @@ version(CustomRuntimeTest) version = UsePSVMem;
 version(WebAssembly)
 {
     public import core.arsd.memory_allocation;
-    import core.stdc.string;
     void abort() pure nothrow @nogc
     {
         static import arsd.webassembly;
