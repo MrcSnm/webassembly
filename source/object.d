@@ -2104,7 +2104,7 @@ void __ArrayDtor(T)(scope T[] a)
         e.__xdtor();
 }
 
-private void onArrayCastError(string typeFrom, size_t fromSize, string typeTo, size_t toSize) nothrow
+private void onArrayCastError(string typeFrom, size_t fromSize, string typeTo, size_t toSize) nothrow @nogc
 {
     version(CustomRuntimePrinter)
         customRuntimePrinter("Invalid ArrayCast from ", typeFrom, "(", fromSize,")", " to ", typeTo, "(", toSize,")");
@@ -2112,7 +2112,7 @@ private void onArrayCastError(string typeFrom, size_t fromSize, string typeTo, s
     abort();
 }
 
-TTo[] __ArrayCast(TFrom, TTo)(return scope TFrom[] from, string file = __FILE__) nothrow
+TTo[] __ArrayCast(TFrom, TTo)(return scope TFrom[] from, string file = __FILE__) nothrow @nogc
 {
     const fromSize = from.length * TFrom.sizeof;
     const toLength = fromSize / TTo.sizeof;
