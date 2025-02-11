@@ -33,6 +33,8 @@ version(WebAssembly)
 			writeln(cast(size_t)((cast(ubyte*) (block + 2)) + block.blockSize), " ", block.file, " : ", block.line);
 	}
 
+	size_t getMemoryAllocated() { return memorySize * 64_000; }
+
 
 	// debug
 	extern(C) void printBlockDebugInfo(const void* ptr) {
@@ -115,7 +117,8 @@ version(WebAssembly)
 
 	private bool growMemoryIfNeeded(size_t sz) @trusted nothrow 
 	{
-		if(cast(size_t) nextFree + AllocatedBlock.sizeof + sz >= memorySize * 64*1024) {
+		if(cast(size_t) nextFree + AllocatedBlock.sizeof + sz >= memorySize * 64*1024)
+		{
 			if(llvm_wasm_memory_grow(0, 4) == size_t.max)
 				assert(0, "Out of memory"); // out of memory
 

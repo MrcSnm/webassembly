@@ -1311,6 +1311,7 @@ extern(C) void[] _d_newarrayiT(const TypeInfo ti, size_t length)
 extern (C) void* _d_newitemU(scope const TypeInfo _ti) pure
 {
 	import core.arsd.objectutils;
+	import core.arsd.memory_allocation;
     auto ti =  cast()_ti;
     immutable tiSize = structTypeInfoSize(ti);
     immutable itemSize = ti.size;

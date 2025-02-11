@@ -170,8 +170,16 @@ else version(UsePSVMem)
         {
             return realloc(ptr, newSize, file, line);
         }
+
         pragma(inline, true)
-        ubyte[] pureRealloc(ubyte[] ptr, size_t newSize, string file = __FILE__, size_t line = __LINE__) pure
+        ubyte[] pureMalloc(size_t size, string file = __FILE__, size_t line = __LINE__) pure @trusted nothrow @nogc
+        {
+            alias PureM = ubyte[] function(size_t sz, string file = __FILE__, size_t line = __LINE__) pure @nogc @trusted nothrow;
+            PureM pureMalloc = cast(PureM)&malloc;
+            return pureMalloc(size, file, line);
+        }
+        pragma(inline, true)
+        ubyte[] pureRealloc(ubyte[] ptr, size_t newSize, string file = __FILE__, size_t line = __LINE__) pure @nogc
         {
             alias pRealloc = ubyte[] function (ubyte[], size_t, string file = __FILE__, size_t line = __LINE__) pure @nogc nothrow;
             auto pureRealloc = cast(pRealloc)&reallocMain;
