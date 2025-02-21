@@ -131,17 +131,17 @@ version(WebAssembly)
 {
     extern(C) void *memcpy(void* dest, const(void)* src, size_t n) pure @nogc nothrow
     {
-        size_t remain = n % size_t.sizeof;
+        ulong remain = n % ulong.sizeof;
         n-= remain;
         ubyte *d = cast(ubyte*) dest;
         const (ubyte) *s = cast(const(ubyte)*)src;
         for(; remain; remain--) *d++ = *s++;
 
 
-        size_t* bigDest = cast(size_t*)d;
-        size_t* bigSrc = cast(size_t*)s;
+        ulong* bigDest = cast(ulong*)d;
+        ulong* bigSrc = cast(ulong*)s;
 
-        for(; n; n-= size_t.sizeof) *bigDest++ = *bigSrc++;
+        for(; n; n-= ulong.sizeof) *bigDest++ = *bigSrc++;
         return dest;
     }
 }
