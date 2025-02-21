@@ -113,24 +113,37 @@ extern(C) void _d_arraybounds_index(string file, uint line, size_t index, size_t
 extern(C) void* memset(void* s, int c, size_t n)  @nogc nothrow pure
 {
 	auto d = cast(ubyte*) s;
-	while(n) {
-		*d = cast(ubyte) c;
-		d++;
-		n--;
-	}
+    size_t remain = n % int.sizeof;
+    n-= remain;
+
+	for(; remain; remain--) *d++ = cast(ubyte)c;
+
+    int* bigDest = cast(int*)d;
+    for(; n; n-= int.sizeof) *bigDest++ = c;
+
 	return s;
 }
 
-pragma(LDC_intrinsic, "llvm.memcpy.p0i8.p0i8.i#")
-    void llvm_memcpy(T)(void* dst, const(void)* src, T len, bool volatile_ = false);
+// pragma(LDC_intrinsic, "llvm.memcpy.p0i8.p0i8.i#")
+//     void llvm_memcpy(T)(void* dst, const(void)* src, T len, bool volatile_ = false);
 
 version(WebAssembly)
-extern(C) void *memcpy(void* dest, const(void)* src, size_t n) pure @nogc nothrow
 {
-	ubyte *d = cast(ubyte*) dest;
-	const (ubyte) *s = cast(const(ubyte)*)src;
-	for (; n; n--) *d++ = *s++;
-	return dest;
+    extern(C) void *memcpy(void* dest, const(void)* src, size_t n) pure @nogc nothrow
+    {
+        size_t remain = n % size_t.sizeof;
+        n-= remain;
+        ubyte *d = cast(ubyte*) dest;
+        const (ubyte) *s = cast(const(ubyte)*)src;
+        for(; remain; remain--) *d++ = *s++;
+
+
+        size_t* bigDest = cast(size_t*)d;
+        size_t* bigSrc = cast(size_t*)s;
+
+        for(; n; n-= size_t.sizeof) *bigDest++ = *bigSrc++;
+        return dest;
+    }
 }
 else
 extern(C) void *memcpy(void* dest, const(void)* src, size_t n) pure @nogc nothrow;
