@@ -51,7 +51,8 @@ else version(UsePSVMem)
 {
     enum MAGIC = ushort.max - 1;
     ///50 megabytes is max
-    enum MaxSize = 5e7;
+    ///Max is 64 megabytes
+    enum MaxSize = 67_108_863;
 
     struct PSVMem
     {
@@ -128,29 +129,25 @@ else version(UsePSVMem)
         }
         ubyte[] realloc(ubyte* ptr, size_t newSize, string file = __FILE__, size_t line = __LINE__)
         {
-            void* thePtr = getPSVMem(ptr);
+            ptr = cast(ubyte*)getPSVMem(ptr);
 
-            if(thePtr is null) //Not heap allocated
+            if(ptr is null) //Not heap allocated
+                return malloc(newSize, file, line);
+            if(newSize == 0)
             {
-                //That MUST be a 0 terminated string (we hope it :)
-                ubyte[] ret = malloc(newSize, file, line);
-                if(ptr !is null)
-                {
-                    cast(void)sceClibPrintf("Copied Unknown\n");
-                    size_t sz = 0; while(ptr[sz] != '\0') sz++;
-                    //Find the initial size
-                    ret[] = ptr[0..sz];
-                }
-                return ret;
+                psv_free(ptr);
+                return null;
             }
-            ///Can't free/use realloc as it will clear memory and runtime copies after realloc.
-            ubyte[] mem = malloc(newSize);
-            size_t oldSize = (cast(PSVMem*)thePtr).size;
 
 
-            mem[0..oldSize] = ptr[0..oldSize];
-            free(ptr);
-            return mem;
+            ///Can't use realloc for some reason...
+            size_t oldSize = (cast(PSVMem*)ptr).size;
+            ptr = psv_realloc_slice(oldSize+PSVMem.sizeof, cast(ubyte*)ptr, PSVMem.sizeof + newSize);
+
+            PSVMem* mem = cast(PSVMem*)ptr;
+            assert(isPSVMem(mem.getPtr), "Not psv mem?");
+            mem.size = newSize;
+            return cast(ubyte[])mem.getPtr[0..newSize];
         }
 
         ubyte[] realloc(ubyte[] ptr, size_t newSize, string file = __FILE__, size_t line = __LINE__)
