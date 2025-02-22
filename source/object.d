@@ -110,19 +110,6 @@ extern(C) void _d_arraybounds_index(string file, uint line, size_t index, size_t
 }
 
 
-extern(C) void* memset(void* s, int c, size_t n)  @nogc nothrow pure
-{
-	auto d = cast(ubyte*) s;
-    size_t remain = n % int.sizeof;
-    n-= remain;
-
-	for(; remain; remain--) *d++ = cast(ubyte)c;
-
-    int* bigDest = cast(int*)d;
-    for(; n; n-= int.sizeof) *bigDest++ = c;
-
-	return s;
-}
 
 // pragma(LDC_intrinsic, "llvm.memcpy.p0i8.p0i8.i#")
 //     void llvm_memcpy(T)(void* dst, const(void)* src, T len, bool volatile_ = false);
@@ -144,22 +131,46 @@ version(WebAssembly)
         for(; n; n-= ulong.sizeof) *bigDest++ = *bigSrc++;
         return dest;
     }
+    extern(C) void* memset(void* s, int c, size_t n)  @nogc nothrow pure
+    {
+        auto d = cast(ubyte*) s;
+
+        ubyte byteC = cast(ubyte)c;
+
+        size_t remain = n % int.sizeof;
+        n-= remain;
+
+        for(; remain; remain--) *d++ = byteC;
+
+        c = (byteC & 0xFF) * 0x01010101;
+
+        int* bigDest = cast(int*)d;
+        for(; n; n-= int.sizeof) *bigDest++ = c;
+
+        return s;
+    }
+    extern(C) int memcmp(const(void)* s1, const(void*) s2, size_t n) pure @nogc nothrow @trusted
+    {
+        auto b = cast(ubyte*) s1;
+        auto b2 = cast(ubyte*) s2;
+        foreach(i; 0 .. n) {
+            if(auto diff = *b -  *b2)
+                return diff;
+            b++;
+            b2++;
+        }
+        return 0;
+    }
+
+
 }
 else
-extern(C) void *memcpy(void* dest, const(void)* src, size_t n) pure @nogc nothrow;
-
-extern(C) int memcmp(const(void)* s1, const(void*) s2, size_t n) pure @nogc nothrow @trusted
 {
-	auto b = cast(ubyte*) s1;
-	auto b2 = cast(ubyte*) s2;
-	foreach(i; 0 .. n) {
-		if(auto diff = *b -  *b2)
-			return diff;
-		b++;
-		b2++;
-	}
-	return 0;
+    extern(C) void* memcpy(void* dest, const(void)* src, size_t n) pure @nogc nothrow;
+    extern(C) void* memset(void* s, int c, size_t n)  @nogc nothrow pure;
+    extern(C) int memcmp(const(void)* s1, const(void*) s2, size_t n) pure @nogc nothrow @trusted;
 }
+
 
 public import core.arsd.utf_decoding;
 
