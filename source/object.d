@@ -151,14 +151,38 @@ version(WebAssembly)
     }
     extern(C) int memcmp(const(void)* s1, const(void*) s2, size_t n) pure @nogc nothrow @trusted
     {
-        auto b = cast(ubyte*) s1;
-        auto b2 = cast(ubyte*) s2;
-        foreach(i; 0 .. n) {
-            if(auto diff = *b -  *b2)
-                return diff;
-            b++;
-            b2++;
+        auto b1 = cast(const(ubyte)*) s1;
+        auto b2 = cast(const(ubyte)*) s2;
+
+        // Compare in chunks of 8 bytes (64-bit) to reduce loop iterations
+        while (n >= 8)
+        {
+            if (*cast(const(ulong)*) b1 != *cast(const(ulong)*) b2) {
+                // Find the first differing byte within the chunk
+                if (b1[0] != b2[0]) return b1[0] - b2[0];
+                if (b1[1] != b2[1]) return b1[1] - b2[1];
+                if (b1[2] != b2[2]) return b1[2] - b2[2];
+                if (b1[3] != b2[3]) return b1[3] - b2[3];
+
+                if (b1[4] != b2[4]) return b1[4] - b2[4];
+                if (b1[5] != b2[5]) return b1[5] - b2[5];
+                if (b1[6] != b2[6]) return b1[6] - b2[6];
+                if (b1[7] != b2[7]) return b1[7] - b2[7];
+            }
+            b1 += 8;
+            b2 += 8;
+            n -= 8;
         }
+
+        // Compare remaining bytes
+        while (n > 0) {
+            if (*b1 != *b2)
+                return *b1 - *b2;
+            b1++;
+            b2++;
+            n--;
+        }
+
         return 0;
     }
 
