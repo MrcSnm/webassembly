@@ -111,44 +111,68 @@ extern(C) void _d_arraybounds_index(string file, uint line, size_t index, size_t
 
 
 
-// pragma(LDC_intrinsic, "llvm.memcpy.p0i8.p0i8.i#")
-//     void llvm_memcpy(T)(void* dst, const(void)* src, T len, bool volatile_ = false);
-
 version(WebAssembly)
 {
-    extern(C) void *memcpy(void* dest, const(void)* src, size_t n) pure @nogc nothrow
+
+    static if(__traits(targetHasFeature, "bulk-memory"))
     {
-        ulong remain = n % ulong.sizeof;
-        n-= remain;
-        ubyte *d = cast(ubyte*) dest;
-        const (ubyte) *s = cast(const(ubyte)*)src;
-        for(; remain; remain--) *d++ = *s++;
+        pragma(LDC_intrinsic, "llvm.memcpy.p0.i32")
+        void wasm_memcpy(void* dst, const(void)* src, size_t size, bool volatile_ = false) pure @nogc nothrow;
+
+        extern(C) void *memcpy(void* dest, const(void)* src, size_t n) pure @nogc nothrow
+        {
+            wasm_memcpy(dest, src, n, false);
+            return dest;
+        }
 
 
-        ulong* bigDest = cast(ulong*)d;
-        ulong* bigSrc = cast(ulong*)s;
 
-        for(; n; n-= ulong.sizeof) *bigDest++ = *bigSrc++;
-        return dest;
+        pragma(LDC_intrinsic, "llvm.memset.p0.i32")
+        void wasm_memset(void* dst, int val, size_t size, bool volatile_ = false) pure @nogc nothrow;
+
+        extern(C) void* memset(void* s, int c, size_t n)  @nogc nothrow pure
+        {
+            wasm_memset(s, cast(char)c, n, false);
+            return s;
+        }
     }
-    extern(C) void* memset(void* s, int c, size_t n)  @nogc nothrow pure
+    else
     {
-        auto d = cast(ubyte*) s;
+        extern(C) void *memcpy(void* dest, const(void)* src, size_t n) pure @nogc nothrow
+        {
+            ulong remain = n % ulong.sizeof;
+            n-= remain;
+            ubyte *d = cast(ubyte*) dest;
+            const (ubyte) *s = cast(const(ubyte)*)src;
+            for(; remain; remain--) *d++ = *s++;
 
-        ubyte byteC = cast(ubyte)c;
 
-        size_t remain = n % int.sizeof;
-        n-= remain;
+            ulong* bigDest = cast(ulong*)d;
+            ulong* bigSrc = cast(ulong*)s;
 
-        for(; remain; remain--) *d++ = byteC;
+            for(; n; n-= ulong.sizeof) *bigDest++ = *bigSrc++;
+            return dest;
+        }
+        extern(C) void* memset(void* s, int c, size_t n)  @nogc nothrow pure
+        {
+            auto d = cast(ubyte*) s;
 
-        c = (byteC & 0xFF) * 0x01010101;
+            ubyte byteC = cast(ubyte)c;
 
-        int* bigDest = cast(int*)d;
-        for(; n; n-= int.sizeof) *bigDest++ = c;
+            size_t remain = n % int.sizeof;
+            n-= remain;
 
-        return s;
+            for(; remain; remain--) *d++ = byteC;
+
+            c = (byteC & 0xFF) * 0x01010101;
+
+            int* bigDest = cast(int*)d;
+            for(; n; n-= int.sizeof) *bigDest++ = c;
+
+            return s;
+        }
     }
+
     extern(C) int memcmp(const(void)* s1, const(void*) s2, size_t n) pure @nogc nothrow @trusted
     {
         auto b1 = cast(const(ubyte)*) s1;
