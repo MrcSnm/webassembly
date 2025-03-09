@@ -178,7 +178,7 @@ private:
         firstUsed = 0;
         used -= deleted;
         deleted = 0;
-        alias pureFreeT = extern(C) void function(void* addr) pure nothrow @trusted @nogc;
+        alias pureFreeT = extern(C) void function(void* addr, string f = __FILE__, size_t l = __LINE__) pure nothrow @trusted @nogc;
         auto freeAddr = cast(pureFreeT)&free;
 
         freeAddr(cast(ubyte*)obuckets.ptr); // safe to free b/c impossible to reference

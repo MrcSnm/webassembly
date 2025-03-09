@@ -89,6 +89,7 @@ else version(UsePSVMem)
             extern(C) ubyte* psv_realloc_slice(size_t length, ubyte* ptr, size_t newSize);
             extern(C) ubyte* psv_malloc(size_t sz);
             extern(C) ubyte* psv_calloc(size_t count, size_t newSize);
+            extern(C) nothrow extern int psv_isOnHeap(void* ptr);
         }
         else
         {
@@ -175,6 +176,11 @@ else version(UsePSVMem)
             ubyte[] ret =  malloc(count*size, file, line);
             ret[] = 0;
             return ret;
+        }
+
+        bool isOnHeap(void* ptr)
+        {
+            return psv_isOnHeap(ptr) == 1;
         }
     }
 }

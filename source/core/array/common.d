@@ -10,13 +10,7 @@ extern (C) byte[] _d_arrayappendcTX(const TypeInfo ti, ref byte[] px, size_t n) 
 	//import std.stdio; writeln(newSize, " ", newLength);
 	ubyte* ptr;
 	bool isHeapAllocated = true;
-
-	version(PSVita)
-	{
-		pragma(mangle, "psv_isOnHeap")
-		extern(C) nothrow extern int psv_isOnHeap(void* ptr);
-		isHeapAllocated = psv_isOnHeap(px.ptr) == 1;
-	}
+	isHeapAllocated = rt.hooks.isOnHeap(px.ptr) == 1;
 
 
 	if(px.ptr is null || !isHeapAllocated)

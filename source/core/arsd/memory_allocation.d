@@ -1,4 +1,5 @@
 module core.arsd.memory_allocation;
+version = WallocAllocaator;
 
 version(WebAssembly)
 {
@@ -10,6 +11,7 @@ version(WebAssembly)
 	//                                           ---unused--- -- stack grows down -- -- heap here --
 	// this is less than __heap_base. memory map 0 ... __data_end ... __heap_base ... end of memory
 	private extern extern(C) ubyte __data_end;
+
 
 	// llvm intrinsics {
 		/+
@@ -23,7 +25,7 @@ version(WebAssembly)
 
 		// in 64 KB pages
 		pragma(LDC_intrinsic, "llvm.wasm.memory.size.i32")
-		@trusted pure nothrow private int llvm_wasm_memory_size(int mem);
+		@trusted pure nothrow @nogc private int llvm_wasm_memory_size(int mem);
 	// }
 	// debug
 	void printBlockDebugInfo(const AllocatedBlock* block) {
@@ -33,7 +35,6 @@ version(WebAssembly)
 			writeln(cast(size_t)((cast(ubyte*) (block + 2)) + block.blockSize), " ", block.file, " : ", block.line);
 	}
 
-	size_t getMemoryAllocated() { return memorySize * 64_000; }
 
 
 	// debug
@@ -57,6 +58,11 @@ version(WebAssembly)
 
 	extern(C) ubyte* bridge_malloc(size_t sz) {
 		return malloc(sz).ptr;
+	}
+
+	bool isOnHeap(const void* ptr) nothrow @nogc @trusted
+	{
+		return ptr >= &__heap_base && cast(size_t)ptr <= llvm_wasm_memory_size(0) * 65_536;
 	}
 
 
@@ -113,9 +119,61 @@ version(WebAssembly)
 
 	static assert(AllocatedBlock.sizeof % 16 == 0);
 
+	version(WallocAllocaator)
+	{
+		import core.walloc;
+
+		size_t getMemoryAllocated() { return getWallocHeapSize(); }
 
 
-	private bool growMemoryIfNeeded(size_t sz) @trusted nothrow 
+		void free(ubyte* ptr, string f = __FILE__, size_t l) @nogc @trusted nothrow
+		{
+			core.walloc.free(ptr);
+		}
+
+
+		ubyte[] malloc(size_t sz, string file = __FILE__, size_t line = __LINE__) @trusted nothrow
+		{
+			return cast(ubyte[])core.walloc.malloc(sz)[0..sz];
+		}
+
+
+		ubyte[] calloc(size_t count, size_t size, string file = __FILE__, size_t line = __LINE__) @trusted nothrow
+		{
+			auto ret = malloc(count*size,file,line);
+			ret[0..$] = 0;
+			return ret;
+		}
+		ubyte[] realloc(ubyte* ptr, size_t newSize, string file = __FILE__, size_t line = __LINE__) @trusted nothrow
+		{
+			return cast(ubyte[])core.walloc.realloc(ptr, newSize)[0..newSize];
+		}
+		export ubyte[] realloc(ubyte[] ptr, size_t newSize, string file = __FILE__, size_t line = __LINE__) @trusted nothrow
+		{
+			return cast(ubyte[])core.walloc.realloc(ptr.ptr, newSize)[0..newSize];
+		}
+		pragma(inline, true)
+		ubyte[] pureRealloc(ubyte[] ptr, size_t newSize, string file = __FILE__, size_t line = __LINE__) pure @trusted nothrow
+		{
+			alias pRealloc = ubyte* function (ubyte*, size_t) pure nothrow @trusted;
+			auto pureRealloc = cast(pRealloc)&core.walloc.realloc;
+			return pureRealloc(ptr.ptr,newSize)[0..newSize];
+		}
+
+		pragma(inline, true)
+		ubyte[] pureMalloc(size_t size, string file = __FILE__, size_t line = __LINE__) pure @trusted nothrow
+		{
+			alias PureM = ubyte[] function(size_t sz, string file = __FILE__, size_t line = __LINE__) pure @trusted nothrow;
+			PureM pureMalloc = cast(PureM)&malloc;
+			return pureMalloc(size, file, line);
+		}
+	}
+	else:
+
+	size_t getMemoryAllocated() { return memorySize * 65_536; }
+
+
+	private bool growMemoryIfNeeded(size_t sz) @trusted nothrow
 	{
 		if(cast(size_t) nextFree + AllocatedBlock.sizeof + sz >= memorySize * 64*1024)
 		{
@@ -130,10 +188,14 @@ version(WebAssembly)
 		return false;
 	}
 
-	void free(ubyte* ptr) @nogc @trusted nothrow {
+	void free(ubyte* ptr, string f = __FILE__, size_t l) @nogc @trusted nothrow {
 		auto block = (cast(AllocatedBlock*) ptr) - 1;
 		if(!block.checkChecksum())
+		{
+			import std.stdio;
+			writeln("Could not check block on free at ", f, ":",l);
 			assert(false, "Could not check block on free");
+		}
 
 		block.used = 0;
 		block.flags = 0;
@@ -207,7 +269,9 @@ version(WebAssembly)
 
 		auto block = (cast(AllocatedBlock*) ptr) - 1;
 		if(!block.checkChecksum())
+		{
 			assert(false, "Could not check block while realloc");
+		}
 
 		// block.populateChecksum();
 		if(newSize <= block.blockSize) {
@@ -236,7 +300,7 @@ version(WebAssembly)
 
 			if(block.flags & AllocatedBlock.Flags.unique) {
 				// if we do malloc, this means we are allowed to free the existing block
-				free(ptr);
+				free(ptr, file, line);
 			}
 
 			assert(cast(size_t) newThing.ptr % 16 == 0);

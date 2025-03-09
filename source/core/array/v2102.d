@@ -30,6 +30,7 @@ ref Tarr _d_arrayappendcTX(Tarr: T[], T)(return ref scope Tarr px, size_t n) @tr
 
 ref Tarr _d_arrayappendT(Tarr : T[], T)(return ref scope Tarr x, scope Tarr y) @trusted pure
 {
+
     auto length = x.length;
 
 
@@ -37,7 +38,7 @@ ref Tarr _d_arrayappendT(Tarr : T[], T)(return ref scope Tarr x, scope Tarr y) @
     auto arrayAppendcTX = cast(pure_d_arrayappendcTX)&_d_arrayappendcTX!(Tarr, T);
 
     arrayAppendcTX(x, y.length);
-    memcpy(cast(Unqual!T*)x.ptr + length * T.sizeof, y.ptr, y.length * T.sizeof);
+    object.memcpy(cast(Unqual!T*)x.ptr + length * T.sizeof, y.ptr, y.length * T.sizeof);
 
     // do postblit
     //__doPostblit(x.ptr + length * sizeelem, y.length * sizeelem, tinext);
