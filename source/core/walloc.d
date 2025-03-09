@@ -473,14 +473,14 @@ private void* allocate_large(size_t size) {
   return obj ? get_large_object_payload(obj) : null;
 }
 
-export void* malloc(size_t size) @nogc @trusted nothrow
+void* malloc(size_t size) @nogc @trusted nothrow
 {
   size_t granules = size_to_granules(size);
   chunk_kind kind = granules_to_chunk_kind(granules);
   return (kind == chunk_kind.LARGE_OBJECT) ? allocate_large(size) : allocate_small(kind);
 }
 
-export void free(void *ptr) @nogc @trusted nothrow
+void free(void *ptr) @nogc @trusted nothrow
 {
   if (!ptr) return;
   page *page = get_page(ptr);

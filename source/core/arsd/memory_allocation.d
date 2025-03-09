@@ -56,7 +56,7 @@ version(WebAssembly)
 	}
 
 
-	extern(C) ubyte* bridge_malloc(size_t sz) {
+	export extern(C) ubyte* bridge_malloc(size_t sz) {
 		return malloc(sz).ptr;
 	}
 
@@ -148,7 +148,7 @@ version(WebAssembly)
 		{
 			return cast(ubyte[])core.walloc.realloc(ptr, newSize)[0..newSize];
 		}
-		export ubyte[] realloc(ubyte[] ptr, size_t newSize, string file = __FILE__, size_t line = __LINE__) @trusted nothrow
+		ubyte[] realloc(ubyte[] ptr, size_t newSize, string file = __FILE__, size_t line = __LINE__) @trusted nothrow
 		{
 			return cast(ubyte[])core.walloc.realloc(ptr.ptr, newSize)[0..newSize];
 		}
@@ -326,7 +326,7 @@ version(WebAssembly)
 		}
 		else return realloc(ptr.ptr, newSize, file, line);
 	}
-	export ubyte[] realloc(ubyte[] ptr, size_t newSize, string file = __FILE__, size_t line = __LINE__) @trusted nothrow
+	ubyte[] realloc(ubyte[] ptr, size_t newSize, string file = __FILE__, size_t line = __LINE__) @trusted nothrow
 	{
 		return reallocMain(ptr, newSize, file, line);
 	}
