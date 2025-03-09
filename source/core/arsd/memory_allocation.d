@@ -56,7 +56,7 @@ version(WebAssembly)
 	}
 
 
-	extern(C) ubyte* bridge_malloc(size_t sz) {
+	export extern(C) ubyte* bridge_malloc(size_t sz) {
 		return malloc(sz).ptr;
 	}
 

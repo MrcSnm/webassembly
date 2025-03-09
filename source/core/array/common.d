@@ -16,12 +16,8 @@ extern (C) byte[] _d_arrayappendcTX(const TypeInfo ti, ref byte[] px, size_t n) 
 	if(px.ptr is null || !isHeapAllocated)
 	{
 		ptr = rt.hooks.malloc(newSize).ptr;
-		auto ns = ptr[0 .. newSize];
-		auto op = px.ptr;
-		auto ol = px.length * elemSize;
-
-		foreach(i, b; op[0 .. ol])
-			ns[i] = b;
+		auto oldLength = px.length * elemSize;
+		ptr[0..oldLength] = cast(ubyte[])px.ptr[0..oldLength];
 	}
 	else
     {
