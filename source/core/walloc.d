@@ -116,11 +116,11 @@ static uint chunk_kind_to_granules(chunk_kind kind)
 {
   switch (kind) with(chunk_kind)
   {
-    static foreach(i, mem; __traits(allMembers, chunk_kind))
+    static foreach(i; SMALL_OBJECT_GRANULES)
     {
-        case mixin(mem): return SMALL_OBJECT_GRANULES[i];
+      case mixin("GRANULES_",i): return i;
     }
-    default: return -1;
+    default: assert(false, "Unknown chunk kind.");
   }
 }
 
@@ -530,25 +530,5 @@ size_t get_alloc_size(void* ptr) {
         large_object* obj = get_large_object(ptr);
         return obj.size;
     }
-
-
-    switch(kind) with (chunk_kind)
-    {
-        case GRANULES_1: return 1 * GRANULE_SIZE;
-        case GRANULES_2: return 2 * GRANULE_SIZE;
-        case GRANULES_3: return 3 * GRANULE_SIZE;
-        case GRANULES_4: return 4 * GRANULE_SIZE;
-        case GRANULES_5: return 5 * GRANULE_SIZE;
-        case GRANULES_6: return 6 * GRANULE_SIZE;
-        case GRANULES_8: return 8 * GRANULE_SIZE;
-        case GRANULES_10: return 10 * GRANULE_SIZE;
-        case GRANULES_16: return 16 * GRANULE_SIZE;
-        case GRANULES_32: return 32 * GRANULE_SIZE;
-        default:
-        {
-            import std.stdio;
-            writeln("Reurning kind ", kind);
-            return kind;
-        }
-    }
+    return GRANULE_SIZE * chunk_kind_to_granules(cast(chunk_kind)kind);
 }
