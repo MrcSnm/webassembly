@@ -49,34 +49,8 @@ version(WebAssembly)
 }
 else version(UsePSVMem)
 {
-    enum MAGIC = ushort.max - 1;
-    ///50 megabytes is max
     ///Max is 64 megabytes
     enum MaxSize = 67_108_863;
-
-    struct PSVMem
-    {
-        size_t size;
-        ushort magicNumber = MAGIC;
-        private ubyte[0] data;
-        pure nothrow @nogc @trusted void* getPtr () return {return (cast(void*)&this) + PSVMem.sizeof;}
-        pragma(inline, true) static uint dataOffset() nothrow pure @nogc @trusted {return PSVMem.sizeof;}
-    }
-
-    bool isPSVMem(void* ptr) pure nothrow @nogc @trusted
-    {
-        if(cast(size_t)ptr <= PSVMem.dataOffset) return false;
-        PSVMem mem = *cast(PSVMem*)(ptr - PSVMem.dataOffset);
-        return mem.magicNumber == MAGIC && mem.size != 0 && mem.size <= MaxSize;
-    }
-    void* getPSVMem(void* ptr) pure nothrow @nogc @trusted
-    {
-        if(ptr is null || !isPSVMem(ptr)) return null;
-        return ptr - PSVMem.dataOffset;
-    }
-
-
-
 
     pure nothrow @nogc @trusted
     {
@@ -86,10 +60,10 @@ else version(UsePSVMem)
             extern(C) void psv_free(ubyte* ptr);
             extern(C) int sceClibPrintf(const(char*) fmt, ...);
             extern(C) ubyte* psv_realloc(ubyte* ptr, size_t newSize);
-            extern(C) ubyte* psv_realloc_slice(size_t length, ubyte* ptr, size_t newSize);
             extern(C) ubyte* psv_malloc(size_t sz);
             extern(C) ubyte* psv_calloc(size_t count, size_t newSize);
-            extern(C) nothrow extern int psv_isOnHeap(void* ptr);
+            extern(C) int psv_isOnHeap(void* ptr);
+            extern(C) size_t psv_get_allocated_memory();
         }
         else
         {
@@ -107,48 +81,26 @@ else version(UsePSVMem)
                 pragma(mangle, "calloc") ubyte* psv_calloc(size_t count, size_t newSize);
                 pragma(mangle, "printf") int sceClibPrintf(const(char*) fmt, ...);
             }
+        }
 
+        size_t getMemoryAllocated()
+        {
+            return psv_get_allocated_memory();
         }
 
         void abort(){psv_abort();}
-        void free(ubyte* ptr) @nogc
+        void free(ubyte* ptr, string file, size_t line) @nogc
         {
-            void* thePtr = getPSVMem(ptr);
-            if(thePtr !is null)
-                psv_free(cast(ubyte*)thePtr);
+            psv_free(ptr);
         }
 
         ubyte[] malloc(size_t sz, string file = __FILE__, size_t line = __LINE__) 
         {
-            if(sz == 0)
-                return null;
-            PSVMem* mem  = cast(PSVMem*)psv_malloc(PSVMem.sizeof + sz);
-            mem.magicNumber = MAGIC;
-            mem.size = cast(typeof(mem.size))sz;
-
-            return (cast(ubyte*)mem.getPtr)[0..sz];
+            return psv_malloc(sz)[0..sz];
         }
         ubyte[] realloc(ubyte* ptr, size_t newSize, string file = __FILE__, size_t line = __LINE__)
         {
-            ptr = cast(ubyte*)getPSVMem(ptr);
-
-            if(ptr is null) //Not heap allocated
-                return malloc(newSize, file, line);
-            if(newSize == 0)
-            {
-                psv_free(ptr);
-                return null;
-            }
-
-
-            ///Can't use realloc for some reason...
-            size_t oldSize = (cast(PSVMem*)ptr).size;
-            ptr = psv_realloc_slice(oldSize+PSVMem.sizeof, cast(ubyte*)ptr, PSVMem.sizeof + newSize);
-
-            PSVMem* mem = cast(PSVMem*)ptr;
-            assert(isPSVMem(mem.getPtr), "Not psv mem?");
-            mem.size = newSize;
-            return cast(ubyte[])mem.getPtr[0..newSize];
+            return psv_realloc(ptr, newSize)[0..newSize];
         }
 
         ubyte[] realloc(ubyte[] ptr, size_t newSize, string file = __FILE__, size_t line = __LINE__)

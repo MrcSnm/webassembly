@@ -27,6 +27,70 @@ version(WebAssembly)
 		pragma(LDC_intrinsic, "llvm.wasm.memory.size.i32")
 		@trusted pure nothrow @nogc private int llvm_wasm_memory_size(int mem);
 	// }
+
+
+
+	export extern(C) ubyte* bridge_malloc(size_t sz) {
+		return malloc(sz).ptr;
+	}
+
+	bool isOnHeap(const void* ptr) nothrow @nogc @trusted
+	{
+		return ptr >= &__heap_base && cast(size_t)ptr <= llvm_wasm_memory_size(0) * 65_536;
+	}
+
+
+	version(WallocAllocaator)
+	{
+		import core.walloc;
+
+		size_t getMemoryAllocated() { return getWallocHeapSize(); }
+
+
+		void free(ubyte* ptr, string f = __FILE__, size_t l) @nogc @trusted nothrow
+		{
+			core.walloc.free(ptr);
+		}
+
+
+		ubyte[] malloc(size_t sz, string file = __FILE__, size_t line = __LINE__) @trusted nothrow
+		{
+			return cast(ubyte[])core.walloc.malloc(sz)[0..sz];
+		}
+
+
+		ubyte[] calloc(size_t count, size_t size, string file = __FILE__, size_t line = __LINE__) @trusted nothrow
+		{
+			auto ret = malloc(count*size,file,line);
+			ret[0..$] = 0;
+			return ret;
+		}
+		ubyte[] realloc(ubyte* ptr, size_t newSize, string file = __FILE__, size_t line = __LINE__) @trusted nothrow
+		{
+			return cast(ubyte[])core.walloc.realloc(ptr, newSize)[0..newSize];
+		}
+		ubyte[] realloc(ubyte[] ptr, size_t newSize, string file = __FILE__, size_t line = __LINE__) @trusted nothrow
+		{
+			return cast(ubyte[])core.walloc.realloc(ptr.ptr, newSize)[0..newSize];
+		}
+		pragma(inline, true)
+		ubyte[] pureRealloc(ubyte[] ptr, size_t newSize, string file = __FILE__, size_t line = __LINE__) pure @trusted nothrow
+		{
+			alias pRealloc = ubyte* function (ubyte*, size_t) pure nothrow @trusted;
+			auto pureRealloc = cast(pRealloc)&core.walloc.realloc;
+			return pureRealloc(ptr.ptr,newSize)[0..newSize];
+		}
+
+		pragma(inline, true)
+		ubyte[] pureMalloc(size_t size, string file = __FILE__, size_t line = __LINE__) pure @trusted nothrow
+		{
+			alias PureM = ubyte[] function(size_t sz, string file = __FILE__, size_t line = __LINE__) pure @trusted nothrow;
+			PureM pureMalloc = cast(PureM)&malloc;
+			return pureMalloc(size, file, line);
+		}
+	}
+	else:
+
 	// debug
 	void printBlockDebugInfo(const AllocatedBlock* block) {
 		import std.stdio;
@@ -34,8 +98,6 @@ version(WebAssembly)
 		if(block.checkChecksum())
 			writeln(cast(size_t)((cast(ubyte*) (block + 2)) + block.blockSize), " ", block.file, " : ", block.line);
 	}
-
-
 
 	// debug
 	extern(C) void printBlockDebugInfo(const void* ptr) {
@@ -56,14 +118,6 @@ version(WebAssembly)
 	}
 
 
-	export extern(C) ubyte* bridge_malloc(size_t sz) {
-		return malloc(sz).ptr;
-	}
-
-	bool isOnHeap(const void* ptr) nothrow @nogc @trusted
-	{
-		return ptr >= &__heap_base && cast(size_t)ptr <= llvm_wasm_memory_size(0) * 65_536;
-	}
 
 
 
@@ -119,56 +173,6 @@ version(WebAssembly)
 
 	static assert(AllocatedBlock.sizeof % 16 == 0);
 
-	version(WallocAllocaator)
-	{
-		import core.walloc;
-
-		size_t getMemoryAllocated() { return getWallocHeapSize(); }
-
-
-		void free(ubyte* ptr, string f = __FILE__, size_t l) @nogc @trusted nothrow
-		{
-			core.walloc.free(ptr);
-		}
-
-
-		ubyte[] malloc(size_t sz, string file = __FILE__, size_t line = __LINE__) @trusted nothrow
-		{
-			return cast(ubyte[])core.walloc.malloc(sz)[0..sz];
-		}
-
-
-		ubyte[] calloc(size_t count, size_t size, string file = __FILE__, size_t line = __LINE__) @trusted nothrow
-		{
-			auto ret = malloc(count*size,file,line);
-			ret[0..$] = 0;
-			return ret;
-		}
-		ubyte[] realloc(ubyte* ptr, size_t newSize, string file = __FILE__, size_t line = __LINE__) @trusted nothrow
-		{
-			return cast(ubyte[])core.walloc.realloc(ptr, newSize)[0..newSize];
-		}
-		export ubyte[] realloc(ubyte[] ptr, size_t newSize, string file = __FILE__, size_t line = __LINE__) @trusted nothrow
-		{
-			return cast(ubyte[])core.walloc.realloc(ptr.ptr, newSize)[0..newSize];
-		}
-		pragma(inline, true)
-		ubyte[] pureRealloc(ubyte[] ptr, size_t newSize, string file = __FILE__, size_t line = __LINE__) pure @trusted nothrow
-		{
-			alias pRealloc = ubyte* function (ubyte*, size_t) pure nothrow @trusted;
-			auto pureRealloc = cast(pRealloc)&core.walloc.realloc;
-			return pureRealloc(ptr.ptr,newSize)[0..newSize];
-		}
-
-		pragma(inline, true)
-		ubyte[] pureMalloc(size_t size, string file = __FILE__, size_t line = __LINE__) pure @trusted nothrow
-		{
-			alias PureM = ubyte[] function(size_t sz, string file = __FILE__, size_t line = __LINE__) pure @trusted nothrow;
-			PureM pureMalloc = cast(PureM)&malloc;
-			return pureMalloc(size, file, line);
-		}
-	}
-	else:
 
 	size_t getMemoryAllocated() { return memorySize * 65_536; }
 
@@ -326,7 +330,7 @@ version(WebAssembly)
 		}
 		else return realloc(ptr.ptr, newSize, file, line);
 	}
-	export ubyte[] realloc(ubyte[] ptr, size_t newSize, string file = __FILE__, size_t line = __LINE__) @trusted nothrow
+	ubyte[] realloc(ubyte[] ptr, size_t newSize, string file = __FILE__, size_t line = __LINE__) @trusted nothrow
 	{
 		return reallocMain(ptr, newSize, file, line);
 	}
@@ -345,4 +349,8 @@ version(WebAssembly)
 		PureM pureMalloc = cast(PureM)&malloc;
 		return pureMalloc(size, file, line);
 	}
+}
+else
+{
+	public import rt.hooks:getMemoryAllocated;
 }
