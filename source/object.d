@@ -20,6 +20,55 @@ alias dstring = immutable(dchar)[];
 alias size_t = typeof(int.sizeof);
 alias ptrdiff_t = typeof(cast(void*)0 - cast(void*)0);
 
+version(PSVita)
+{
+    //PSVita has a bug when casting to double/float a long/ulong. Use these for convenience.
+    private extern(C) pure nothrow @nogc @trusted
+    {
+        float longToFloat(long);
+        float ulongToFloat(ulong);
+
+        double longToDouble(long);
+        double ulongToDouble(ulong);
+
+    }
+    pure nothrow @nogc @trusted pragma(inline, true)
+    {
+        float Float(int a){return  cast(float)(a);}
+        float Float(uint a){return cast(float)(a);}
+        float Float(long a){return longToFloat(a);}
+        float Float(ulong a){return ulongToFloat(a);}
+
+        double Double(long a){return longToDouble(a);}
+        double Double(ulong a){return ulongToDouble(a);}
+        double Double(int a){return cast(double)(a);}
+        double Double(uint a){return cast(double)(a);}
+    }
+}
+else
+{
+    pure nothrow @nogc @trusted pragma(inline, true)
+    {
+        float Float(int a){return  cast(float)(a);}
+        float Float(uint a){return cast(float)(a);}
+
+        float Float(long a){return cast(float)(a);}
+        float Float(ulong a){return cast(float)(a);}
+
+        double Double(ulong a){return cast(double)(a);}
+        double Double(long a){return cast(double)(a);}
+        double Double(int a){return cast(double)(a);}
+        double Double(uint a){return cast(double)(a);}
+    }
+}
+pure nothrow @nogc @trusted pragma(inline, true)
+{
+    float Float(float a){return a;}
+    float Float(double a){return a;}
+    double Double(float a){return a;}
+    double Double(double a){return a;}
+}
+
 
 // then the entry point just for convenience so main works.
 extern(C) int _Dmain(string[] args);
