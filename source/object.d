@@ -104,17 +104,8 @@ template _arrayOp(Args...)
 }
 
 extern(C) void _d_array_slice_copy(void* dst, size_t dstlen, void* src, size_t srclen, size_t elemsz) {
-	auto d = cast(ubyte*) dst;
-	auto s = cast(ubyte*) src;
-	auto len = dstlen * elemsz;
-
-	while(len) {
-		*d = *s;
-		d++;
-		s++;
-		len--;
-	}
-
+    assert(srclen == dstlen, "Can't copy different length.");
+    memcpy(dst, src, elemsz*dstlen);
 }
 
 void reserve(T)(ref T[] arr, size_t length) @trusted {
