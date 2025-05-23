@@ -1,5 +1,5 @@
 module core.arsd.memory_allocation;
-version = WallocAllocaator;
+version = WallocAllocator;
 
 version(WebAssembly)
 {
@@ -40,7 +40,7 @@ version(WebAssembly)
 	}
 
 
-	version(WallocAllocaator)
+	version(WallocAllocator)
 	{
 		import core.walloc;
 
@@ -50,12 +50,14 @@ version(WebAssembly)
 		void free(ubyte* ptr, string f = __FILE__, size_t l) @nogc @trusted nothrow
 		{
 			core.walloc.free(ptr);
+			// core.myalloc.mya_free(ptr);
 		}
 
 
 		ubyte[] malloc(size_t sz, string file = __FILE__, size_t line = __LINE__) @trusted nothrow
 		{
 			return cast(ubyte[])core.walloc.malloc(sz)[0..sz];
+			// return cast(ubyte[])core.myalloc.mya_malloc(sz)[0..sz];
 		}
 
 
@@ -68,16 +70,19 @@ version(WebAssembly)
 		ubyte[] realloc(ubyte* ptr, size_t newSize, string file = __FILE__, size_t line = __LINE__) @trusted nothrow
 		{
 			return cast(ubyte[])core.walloc.realloc(ptr, newSize)[0..newSize];
+			// return cast(ubyte[])core.myalloc.mya_realloc(ptr, newSize)[0..newSize];
 		}
 		ubyte[] realloc(ubyte[] ptr, size_t newSize, string file = __FILE__, size_t line = __LINE__) @trusted nothrow
 		{
 			return cast(ubyte[])core.walloc.realloc(ptr.ptr, newSize)[0..newSize];
+			// return cast(ubyte[])core.myalloc.mya_realloc(ptr.ptr, newSize)[0..newSize];
 		}
 		pragma(inline, true)
 		ubyte[] pureRealloc(ubyte[] ptr, size_t newSize, string file = __FILE__, size_t line = __LINE__) pure @trusted nothrow
 		{
 			alias pRealloc = ubyte* function (ubyte*, size_t) pure nothrow @trusted;
 			auto pureRealloc = cast(pRealloc)&core.walloc.realloc;
+			// auto pureRealloc = cast(pRealloc)&core.myalloc.mya_realloc;
 			return pureRealloc(ptr.ptr,newSize)[0..newSize];
 		}
 

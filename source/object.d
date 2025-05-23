@@ -322,12 +322,12 @@ extern(C) void _d_assert_msg(string msg, string file, uint line) @trusted @nogc 
 	rt.hooks.abort();
 }
 
-extern (C) noreturn onOutOfMemoryError(void* pretend_sideffect = null) @trusted pure nothrow @nogc /* dmd @@@BUG11461@@@ */
+private extern (C) noreturn onOutOfMemoryError(void* pretend_sideffect = null) @trusted pure nothrow @nogc /* dmd @@@BUG11461@@@ */
 {
     assert(false, "Out of memory");
 }
 
-extern (C) noreturn onOutOfMemoryErrorNoGC() @trusted nothrow @nogc
+private extern (C) noreturn onOutOfMemoryErrorNoGC() @trusted nothrow @nogc
 {
     assert(false, "Out of memory");
 }
