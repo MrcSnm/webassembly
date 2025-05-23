@@ -967,6 +967,7 @@ class TypeInfo_Pointer : TypeInfo
 	override const(void)[] initializer() const @trusted { return (cast(void *)null)[0 .. (void*).sizeof]; }
 
     override const (TypeInfo) next() const { return m_next; }
+    override string toString() const { return m_next.toString() ~ "*"; }
 }
 
 class TypeInfo_Array : TypeInfo {
@@ -1358,6 +1359,7 @@ class TypeInfo_Enum : TypeInfo {
     {
         return m_init.length ? m_init : base.initializer();
     }
+    override string toString() const pure { return name; }
 }
 
 
@@ -1545,23 +1547,12 @@ else
 
 template _d_arraysetlengthTImpl(Tarr : T[], T) {
 	size_t _d_arraysetlengthT(return scope ref Tarr arr, size_t newlength) @trusted pure {
-		auto orig = arr;
 
 		if(newlength <= arr.length) {
 			arr = arr[0 ..newlength];
 		} else {
 			auto ptr = cast(T*) pureRealloc(cast(ubyte[])arr, newlength * T.sizeof);
 			arr = ptr[0 .. newlength];
-			if(orig !is null) {
-                static if(is(Tarr == string))
-				    (cast(char[])arr)[0 .. orig.length] = orig[];
-                else static if(is(Tarr == wstring))
-				    (cast(wchar[])arr)[0 .. orig.length] = orig[];
-                else static if(is(Tarr == dstring))
-				    (cast(dchar[])arr)[0 .. orig.length] = orig[];
-                else
-				    arr[0 .. orig.length] = orig[];
-			}
 		}
 
 		return newlength;
@@ -2011,6 +2002,7 @@ class TypeInfo_Delegate : TypeInfo {
 class TypeInfo_Interface : TypeInfo
 {
 	TypeInfo_Class info;
+    override string toString() const pure { return info.name; }
 
 	override bool equals(in void* p1, in void* p2) const
     {
@@ -2045,6 +2037,10 @@ class TypeInfo_Interface : TypeInfo
 }
 
 class TypeInfo_Const : TypeInfo {
+    override string toString() const
+    {
+        return cast(string) ("const(" ~ base.toString() ~ ")");
+    }
 	override size_t getHash(scope const(void*) p) @trusted const nothrow { return base.getHash(p); }
 	TypeInfo base;
 	override size_t size() const { return base.size; }
@@ -2052,6 +2048,19 @@ class TypeInfo_Const : TypeInfo {
 	override const(void)[] initializer() nothrow pure const{return base.initializer();}
     override @property size_t talign() nothrow pure const { return base.talign; }
 	override bool equals(in void* p1, in void* p2) const { return base.equals(p1, p2); 	}
+
+    override bool opEquals(Object o)
+    {
+        if (this is o)
+            return true;
+
+        if (typeid(this) != typeid(o))
+            return false;
+
+        auto t = cast(TypeInfo_Const)o;
+        return base.opEquals(t.base);
+    }
+
 }
 
 
@@ -2083,23 +2092,23 @@ class TypeInfo_Immutable : TypeInfo {
 	TypeInfo base;
 }
 +/
-class TypeInfo_Invariant : TypeInfo {
-	TypeInfo base;
-	override size_t getHash(scope const (void*) p) @trusted const nothrow { return base.getHash(p); }
-	override size_t size() const { return base.size; }
-	override const(TypeInfo) next() const { return base; }
+class TypeInfo_Invariant : TypeInfo_Const {
+	override string toString() const
+    {
+        return cast(string) ("immutable(" ~ base.toString() ~ ")");
+    }
 }
-class TypeInfo_Shared : TypeInfo {
-	override size_t getHash(scope const (void*) p) @trusted const nothrow { return base.getHash(p); }
-	TypeInfo base;
-	override size_t size() const { return base.size; }
-	override const(TypeInfo) next() const { return base; }
+class TypeInfo_Shared : TypeInfo_Const {
+	override string toString() const
+    {
+        return cast(string) ("shared(" ~ base.toString() ~ ")");
+    }
 }
-class TypeInfo_Inout : TypeInfo {
-	override size_t getHash(scope const (void*) p) @trusted const nothrow { return base.getHash(p); }
-	TypeInfo base;
-	override size_t size() const { return base.size; }
-	override const(TypeInfo) next() const { return base; }
+class TypeInfo_Inout : TypeInfo_Const {
+	override string toString() const
+    {
+        return cast(string) ("inout(" ~ base.toString() ~ ")");
+    }
 }
 
 class TypeInfo_Struct : TypeInfo {
