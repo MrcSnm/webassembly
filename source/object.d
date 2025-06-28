@@ -5,6 +5,8 @@ import rt.hooks;
 version(WebAssembly)
     static import arsd.webassembly;
 
+public import core.internal.hash : hashOf;
+
 version(PSVita) version = CustomRuntimePrinter;
 version(CustomRuntimeTest) version = CustomRuntimePrinter;
 
@@ -19,6 +21,8 @@ alias wstring = immutable(wchar)[];
 alias dstring = immutable(dchar)[];
 alias size_t = typeof(int.sizeof);
 alias ptrdiff_t = typeof(cast(void*)0 - cast(void*)0);
+alias hash_t = size_t;
+alias uintptr_t = uint*;
 
 version(PSVita)
 {
@@ -156,7 +160,9 @@ version(WebAssembly)
 
     static if(__traits(targetHasFeature, "bulk-memory"))
     {
-        pragma(LDC_intrinsic, "llvm.memcpy.p0.i32")
+      static if(__VERSION__ >= 2110)
+      {
+        pragma(LDC_intrinsic, "llvm.memcpy.p0.p0.i32") // v2.110
         void wasm_memcpy(void* dst, const(void)* src, size_t size, bool volatile_ = false) pure @nogc nothrow;
 
         extern(C) void *memcpy(void* dest, const(void)* src, size_t n) pure @nogc nothrow
@@ -167,14 +173,44 @@ version(WebAssembly)
 
 
 
-        pragma(LDC_intrinsic, "llvm.memset.p0.i32")
-        void wasm_memset(void* dst, int val, size_t size, bool volatile_ = false) pure @nogc nothrow;
+        pragma(LDC_intrinsic, "llvm.memset.p0.i32") // v2.110
+        void wasm_memset(void* dst, ubyte val, size_t size, bool volatile_ = false) pure @nogc nothrow;
 
         extern(C) void* memset(void* s, int c, size_t n)  @nogc nothrow pure
         {
-            wasm_memset(s, cast(char)c, n, false);
+            wasm_memset(s, cast(ubyte)c, n, false);
             return s;
         }
+
+        pragma(LDC_intrinsic, "llvm.memmove.p0.p0.i32") // v2.110 ldc-1.40
+        void wasm_memmove(T)(void* dst, const(void)* src, T len, bool volatile_ = false) pure @nogc nothrow;
+
+        extern(C) void memmove(void* dst, const(void)* src, size_t n) pure @nogc nothrow
+        {
+            wasm_memmove(dst, src, n, false);
+        }
+      }
+      else {
+          pragma(LDC_intrinsic, "llvm.memcpy.p0.i32")
+          void wasm_memcpy(void* dst, const(void)* src, size_t size, bool volatile_ = false) pure @nogc nothrow;
+
+          extern(C) void *memcpy(void* dest, const(void)* src, size_t n) pure @nogc nothrow
+          {
+              wasm_memcpy(dest, src, n, false);
+              return dest;
+          }
+
+
+
+          pragma(LDC_intrinsic, "llvm.memset.p0.i32")
+          void wasm_memset(void* dst, int val, size_t size, bool volatile_ = false) pure @nogc nothrow;
+
+          extern(C) void* memset(void* s, int c, size_t n)  @nogc nothrow pure
+          {
+              wasm_memset(s, cast(char)c, n, false);
+              return s;
+          }
+      }
     }
     else
     {
@@ -322,6 +358,12 @@ extern(C) void _d_assert_msg(string msg, string file, uint line) @trusted @nogc 
 	rt.hooks.abort();
 }
 
+static if(__VERSION__ >= 2110)
+private extern (C) noreturn onOutOfMemoryError(void* pretend_sideffect = null, string file = __FILE__, size_t line = __LINE__) @trusted pure nothrow @nogc /* dmd @@@BUG11461@@@ */
+{
+	assert(false, "Out of memory");
+}
+else
 private extern (C) noreturn onOutOfMemoryError(void* pretend_sideffect = null) @trusted pure nothrow @nogc /* dmd @@@BUG11461@@@ */
 {
     assert(false, "Out of memory");
@@ -1689,6 +1731,7 @@ do
 
 public import core.array.v2102;
 public import core.array.v2099;
+public import core.array.assign;
 
 
 
@@ -1848,7 +1891,7 @@ extern (C) void[] _d_arrayappendcd(ref byte[] x, dchar c)
 
 
 
-alias AliasSeq(T...) = T;
+private alias AliasSeq(T...) = T;
 static foreach(type; AliasSeq!(bool, byte, char, dchar, double, float, int, long, short, ubyte, uint, ulong, ushort, void, wchar)) {
 	mixin(q{
 		class TypeInfo_}~type.mangleof~q{ : TypeInfo {
@@ -1938,6 +1981,22 @@ class TypeInfo_Axa : TypeInfo_Aa {
 class TypeInfo_Aya : TypeInfo_Aa {
 
 }
+
+// fake capacity
+size_t _d_arraysetcapacityPureNothrow(T)(size_t newcapacity, void[]* p, bool isshared) pure nothrow @trusted {
+    return 0;
+}
+
+@property size_t capacity(T)(T[] arr) pure nothrow @trusted
+{
+    import core.internal.traits : Unqual;
+    const isshared = is(T == shared);
+    alias Unqual_T = Unqual!T;
+    // The postblit of T may be impure, so we need to use the `pure nothrow` wrapper
+    return _d_arraysetcapacityPureNothrow!Unqual_T(0, cast(void[]*)&arr, isshared);
+}
+
+static assert(is(typeof("foo".capacity))); // ensure char[].capacity exists
 
 class TypeInfo_Function : TypeInfo
 {
@@ -2332,7 +2391,40 @@ immutable(T)[] idup(T)(scope const(T)[] array) pure nothrow @trusted
 	return result;
 }
 
-class Error { this(string msg) pure @trusted nothrow {} }
+/**
+ * The base class of all unrecoverable runtime errors.
+ *
+ * This represents the category of $(D Throwable) objects that are $(B not)
+ * safe to catch and handle. In principle, one should not catch Error
+ * objects, as they represent unrecoverable runtime errors.
+ * Certain runtime guarantees may fail to hold when these errors are
+ * thrown, making it unsafe to continue execution after catching them.
+ */
+class Error : Throwable 
+{
+	/**
+     * Creates a new instance of Error. The nextInChain parameter is used
+     * internally and should always be $(D null) when passed by user code.
+     * This constructor does not automatically throw the newly-created
+     * Error; the $(D throw) statement should be used for that purpose.
+     */
+    @nogc @safe pure nothrow this(string msg, Throwable nextInChain = null)
+    {
+        super(msg, nextInChain);
+        bypassedException = null;
+    }
+
+    @nogc @safe pure nothrow this(string msg, string file, size_t line, Throwable nextInChain = null)
+    {
+        super(msg, file, line, nextInChain);
+        bypassedException = null;
+    }
+
+    /** The first $(D Exception) which was bypassed when this Error was thrown,
+    or $(D null) if no $(D Exception)s were pending. */
+    Throwable   bypassedException; 
+}
+
 class Throwable : Object
 {
     interface TraceInfo
@@ -2514,6 +2606,99 @@ class Exception : Throwable
     {
         super(msg, file, line, nextInChain);
     }
+}
+
+// still needed because postblit is not yet superseded by copy/move constructors
+// from core.internal.postblit.d
+
+// compiler frontend lowers struct array postblitting to this
+void __ArrayPostblit(T)(T[] a)
+{
+    foreach (ref T e; a)
+        e.__xpostblit();
+}
+
+package void postblitRecurse(S)(ref S s)
+    if (is(S == struct))
+{
+    static if (__traits(hasMember, S, "__xpostblit") &&
+               // Bugzilla 14746: Check that it's the exact member of S.
+               __traits(isSame, S, __traits(parent, s.__xpostblit)))
+        s.__xpostblit();
+}
+
+package void postblitRecurse(E, size_t n)(ref E[n] arr)
+{
+    import core.internal.destruction: destructRecurse;
+    import core.internal.traits : hasElaborateCopyConstructor;
+
+    static if (hasElaborateCopyConstructor!E)
+    {
+        size_t i;
+        scope(failure)
+        {
+            for (; i != 0; --i)
+            {
+                destructRecurse(arr[i - 1]); // What to do if this throws?
+            }
+        }
+
+        for (i = 0; i < arr.length; ++i)
+            postblitRecurse(arr[i]);
+    }
+}
+
+
+// fake exception handling
+
+version(Emscripten) 
+{
+    struct _Unwind_Exception;
+    extern(C) Throwable _d_eh_enter_catch(_Unwind_Exception* exceptionObject) { return null; }
+    // do we really need this? it should be provided by LDC/LLVM
+    void _Unwind_Resume(void*) {}
+}
+
+// fake runtime init/deinit
+
+version(Emscripten) 
+{
+    pragma(mangle, "_D4core7runtime7Runtime10initializeFZb")
+    export bool rt_initialize() { return !!rt_init(); }
+    pragma(mangle, "_D4core7runtime7Runtime9terminateFZb")
+    export bool rt_terminate() { return !!rt_term(); }
+    extern(C) int rt_init() { return 1; }
+    extern(C) int rt_term() { return 1; }
+    
+    // required by emscripten startup code, aka tlsInitFunc()
+    export extern(C) void* _emscripten_tls_init();
+
+    // unfortunately this alone does not prevents the linker from stripping it
+    export extern(C) void* tlsInitFunc() { 
+        return _emscripten_tls_init();
+    }
+}
+
+// GC stuff
+
+extern(C) void gc_addRange(const void* p, size_t sz, const scope TypeInfo ti = null) nothrow @nogc {}
+extern(C) void gc_addRoot(const void* p) nothrow @nogc {}
+extern(C) void gc_removeRange(const void* p) nothrow @nogc {}
+extern(C) void gc_removeRoot(const void* p) nothrow @nogc {}
+
+// A no-op handlers to make emscripten library loadable without errors, 
+// these might better be removed later as it may cause very hard to find multithreading bugs
+
+// druntime/rt/critical_.d
+
+version(Emscripten) 
+{
+    struct D_CRITICAL_SECTION;
+    extern (C) void _d_critical_init() @nogc nothrow {}
+    extern (C) void _d_critical_term() @nogc nothrow {}
+    extern (C) void _d_criticalenter(D_CRITICAL_SECTION* cs) nothrow {}
+    extern (C) void _d_criticalenter2(D_CRITICAL_SECTION** pcs) nothrow {}
+    extern (C) void _d_criticalexit(D_CRITICAL_SECTION* cs) nothrow {}
 }
 
 /**

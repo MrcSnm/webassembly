@@ -1,6 +1,9 @@
 module rt.tls_armeabi;
 
-// version(ARM):
+version(ARM) version = ARM_Any;
+version(AArch64) version = ARM_Any;
+
+version(ARM_Any):
 
 extern(C) @nogc nothrow pure
 {

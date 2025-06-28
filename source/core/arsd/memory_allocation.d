@@ -1,5 +1,4 @@
 module core.arsd.memory_allocation;
-version = WallocAllocator;
 
 version(WebAssembly)
 {
