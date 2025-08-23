@@ -1328,6 +1328,12 @@ alias AssociativeArray(Key, Value) = Value[Key];
 
 class TypeInfo_AssociativeArray : TypeInfo
 {
+
+    static struct Entry(K, V)
+    {
+        K key;
+        V value;
+    }
     override string toString() const
     {
         return value.toString() ~ "[" ~ key.toString() ~ "]";
@@ -1370,6 +1376,7 @@ class TypeInfo_AssociativeArray : TypeInfo
 
     TypeInfo value;
     TypeInfo key;
+    TypeInfo entry;
 
     override @property size_t talign() nothrow pure const
     {
@@ -2124,8 +2131,8 @@ class TypeInfo_Const : TypeInfo {
 
 
 ///For some reason, getHash for interfaces wanted that
-pragma(mangle, "_D9invariant12_d_invariantFC6ObjectZv")
-extern(D) void _d_invariant(Object o)
+pragma(mangle, "_D2rt10invariant_12_d_invariantFC6ObjectZv")
+export extern(D) void _d_invariant(Object o)
 {
     TypeInfo_Class c;
 
