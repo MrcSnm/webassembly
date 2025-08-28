@@ -297,6 +297,62 @@ else
 
 
 public import core.arsd.utf_decoding;
+public import core.internal.cast_v2111;
+
+
+//WTF: Function needed there or else will get stripped
+// Needed because ClassInfo.opEquals(Object) does a dynamic cast,
+// but we are trying to implement dynamic cast.
+bool areClassInfosEqual(scope const TypeInfo_Class a, scope const TypeInfo_Class b) pure nothrow @safe @nogc
+{
+    // same class if signatures match, works with potential duplicates across binaries
+    if (a is b)
+        return true;
+
+    // new fast way
+    if (a.flags & 0x200) /*TypeInfo_Class.ClassFlags.hasNameSig*/
+        return a.nameSig[0] == b.nameSig[0]
+            && a.nameSig[1] == b.nameSig[1]
+            && a.nameSig[2] == b.nameSig[2]
+            && a.nameSig[3] == b.nameSig[3];
+
+    // old slow way for temporary binary compatibility
+    return a.name == b.name;
+}
+
+//WTF: Function needed there or else will get stripped
+void* _d_class_cast_impl(const return scope Object o, const TypeInfo_Class c) pure nothrow @safe @nogc
+{
+    if (!o)
+        return null;
+
+    TypeInfo_Class oc = typeid(o);
+    int delta = oc.depth;
+
+    if (delta && c.depth)
+    {
+        delta -= c.depth;
+        if (delta < 0)
+            return null;
+
+        while (delta--)
+            oc = oc.base;
+        if (areClassInfosEqual(oc, c))
+            return cast(void*)o;
+        return null;
+    }
+
+    // no depth data - support the old way
+    do
+    {
+        if (areClassInfosEqual(oc, c))
+            return cast(void*)o;
+        oc = oc.base;
+    } while (oc);
+    return null;
+}
+
+
 
 // }
 
@@ -399,110 +455,6 @@ extern(C) Object _d_allocclass(TypeInfo_Class ti) {
 	return cast(Object) ptr.ptr;
 }
 
-extern(C) void* _d_dynamic_cast(Object o, TypeInfo_Class c) {
-	void* res = null;
-	size_t offset = 0;
-	if (o && _d_isbaseof2(typeid(o), c, offset))
-	{
-		res = cast(void*) o + offset;
-	}
-	return res;
-}
-
-/*****
- * Dynamic cast from a class object o to class c, where c is a subclass of o.
- * Params:
- *      o = instance of class
- *      c = a subclass of o
- * Returns:
- *      null if o is null or c is not a subclass of o. Otherwise, return o.
- */
-void* _d_class_cast(Object o, TypeInfo_Class c)
-{
-    if (!o)
-        return null;
-    
-    // Needed because ClassInfo.opEquals(Object) does a dynamic cast,
-    // but we are trying to implement dynamic cast.
-    static bool areClassInfosEqual(scope const TypeInfo_Class a, scope const TypeInfo_Class b) @safe
-    {
-        // same class if signatures match, works with potential duplicates across binaries
-        return a is b ||
-            (a.flags & 0x200 /*TypeInfo_Class.ClassFlags.hasNameSig*/
-            ? (a.nameSig[0] == b.nameSig[0] &&
-            a.nameSig[1] == b.nameSig[1])  // new fast way
-            : (a is b || a.name == b.name));  // old slow way for temporary binary compatibility
-    }
-
-
-    TypeInfo_Class oc = typeid(o);
-    int delta = oc.depth;
-
-    if (delta && c.depth)
-    {
-        delta -= c.depth;
-        if (delta < 0)
-            return null;
-
-        while (delta--)
-            oc = oc.base;
-        if (areClassInfosEqual(oc, c))
-            return cast(void*)o;
-        return null;
-    }
-
-    // no depth data - support the old way
-    do
-    {
-        if (areClassInfosEqual(oc, c))
-            return cast(void*)o;
-        oc = oc.base;
-    } while (oc);
-    return null;
-}
-
-/*************************************
- * Attempts to cast Object o to class c.
- * Returns o if successful, null if not.
- */
-extern(C) void* _d_interface_cast(void* p, TypeInfo_Class c)
-{
-    if (!p)
-        return null;
-
-    Interface* pi = **cast(Interface***) p;
-    return _d_dynamic_cast(cast(Object)(p - pi.offset), c);
-}
-
-
-extern(C)
-int _d_isbaseof2(scope TypeInfo_Class oc, scope const TypeInfo_Class c, scope ref size_t offset) @safe
-
-{
-    if (oc is c)
-        return true;
-
-    do
-    {
-        if (oc.base is c)
-            return true;
-
-        // Bugzilla 2013: Use depth-first search to calculate offset
-        // from the derived (oc) to the base (c).
-        foreach (iface; oc.interfaces)
-        {
-            if (iface.classinfo is c || _d_isbaseof2(iface.classinfo, c, offset))
-            {
-                offset += iface.offset;
-                return true;
-            }
-        }
-
-        oc = oc.base;
-    } while (oc);
-
-    return false;
-}
 
 int __cmp(T)(scope const T[] lhs, scope const T[] rhs) @trusted pure @nogc nothrow
     if (__traits(isScalar, T))
@@ -894,6 +846,9 @@ class TypeInfo_Class : TypeInfo
     {
         return m_offTi;
     }
+    final @property auto info() @safe @nogc nothrow pure const return { return this; }
+    final @property auto typeinfo() @safe @nogc nothrow pure const return { return this; }
+
 
 
     override size_t getHash(scope const void* p) @trusted const
@@ -1594,148 +1549,7 @@ else
 
 
 
-template _d_arraysetlengthTImpl(Tarr : T[], T) {
-	size_t _d_arraysetlengthT(return scope ref Tarr arr, size_t newlength) @trusted pure {
-
-		if(newlength <= arr.length) {
-			arr = arr[0 ..newlength];
-		} else {
-			auto ptr = cast(T*) pureRealloc(cast(ubyte[])arr, newlength * T.sizeof);
-			arr = ptr[0 .. newlength];
-		}
-
-		return newlength;
-	}
-}
-
-extern (C) void[] _d_arraysetlengthT(const TypeInfo ti, size_t newlength, void[]* p)
-in
-{
-    assert(ti);
-    assert(!(*p).length || (*p).ptr);
-}
-do
-{
-    import core.arsd.objectutils;
-    if (newlength <= (*p).length)
-    {
-        *p = (*p)[0 .. newlength];
-        void* newdata = (*p).ptr;
-        return newdata[0 .. newlength];
-    }
-    auto tinext = ti.next;
-    size_t sizeelem = tinext.size;
-
-    /* Calculate: newsize = newlength * sizeelem
-     */
-    bool overflow = false;
-    import core.checkedint : mulu;
-    const size_t newsize = mulu(sizeelem, newlength, overflow);
-    if (overflow)
-        onOutOfMemoryError();
-
-    if (!(*p).ptr)
-    {
-        // pointer was null, need to allocate
-        auto info = malloc(newsize);
-        memset(info.ptr, 0, newsize);
-        *p = info[0 .. newlength];
-        return *p;
-    }
-
-    const size_t size = (*p).length * sizeelem;
-
-    /* Attempt to extend past the end of the existing array.
-     * If not possible, allocate new space for entire array and copy.
-     */
-    auto ptr = pureRealloc(cast(ubyte[])*p, newsize);
-    ptr[0 .. size] = cast(ubyte[])p.ptr[0 .. size];
-
-    /* Do postblit processing, as we are making a copy and the
-    * original array may have references.
-    * Note that this may throw.
-    */
-    __doPostblit(p.ptr, size, tinext);
-
-    // Initialize the unused portion of the newly allocated space
-    memset(p.ptr + size, 0, newsize - size);
-    return *p;
-}
-
-extern (C) void[] _d_arraysetlengthiT(const TypeInfo ti, size_t newlength, void[]* p)
-in
-{
-    assert(!(*p).length || (*p).ptr);
-}
-do
-{
-    import core.arsd.objectutils;
-    if (newlength <= (*p).length)
-    {
-        *p = (*p)[0 .. newlength];
-        void* newdata = (*p).ptr;
-        return newdata[0 .. newlength];
-    }
-    auto tinext = ti.next;
-    size_t sizeelem = tinext.size;
-
-    import core.checkedint : mulu;
-    bool overflow;
-    const size_t newsize = mulu(sizeelem, newlength, overflow);
-    if (overflow)
-        onOutOfMemoryError();
-
-    static void doInitialize(void *start, void *end, const void[] initializer)
-    {
-        if (initializer.length == 1)
-        {
-            memset(start, *(cast(ubyte*)initializer.ptr), end - start);
-        }
-        else
-        {
-            auto q = initializer.ptr;
-            immutable initsize = initializer.length;
-            for (; start < end; start += initsize)
-            {
-                memcpy(start, q, initsize);
-            }
-        }
-    }
-
-    if (!(*p).ptr)
-    {
-        // pointer was null, need to allocate
-        auto info = malloc(newsize);
-        doInitialize(info.ptr, info.ptr + newsize, tinext.initializer);
-        *p = info[0 .. newlength];
-        return *p;
-    }
-
-    const size_t size = (*p).length * sizeelem;
-
-    /* Attempt to extend past the end of the existing array.
-     * If not possible, allocate new space for entire array and copy.
-     */
-    auto ptr = pureRealloc(cast(ubyte[])*p, newsize);
-    ptr[0 .. size] = cast(ubyte[])p.ptr[0 .. size];
-
-    /* Do postblit processing, as we are making a copy and the
-    * original array may have references.
-    * Note that this may throw.
-    */
-    __doPostblit(p.ptr, size, tinext);
-
-    // Initialize the unused portion of the newly allocated space
-    doInitialize(p.ptr + size, p.ptr + newsize, tinext.initializer);
-    return *p;
-}
-
-
-// extern(C) void[] _d_arraysetlengthiT(const TypeInfo ti, size_t newlength, void[]* p)
-// {
-
-// }
-
+public import core.array.setlength;
 public import core.array.v2102;
 public import core.array.v2099;
 public import core.array.assign;
@@ -1790,7 +1604,7 @@ Tret _d_arraycatnTX(Tret, Tarr...)(auto ref Tarr froms) @trusted
     if (totalLen == 0)
         return res;
 
-    _d_arraysetlengthTImpl!(typeof(res))._d_arraysetlengthT(res, totalLen);
+    _d_arraysetlengthT(res, totalLen);
 
     /* Currently, if both a postblit and a cpctor are defined, the postblit is
      * used. If this changes, the condition below will have to be adapted.
