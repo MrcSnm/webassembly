@@ -106,12 +106,12 @@ private size_t _d_arraysetlengthT_(Tarr : T[], T)(return ref scope Tarr arr, siz
     }
 
     size_t oldsize = arr.length * sizeelem;
-    auto ret = pureRealloc(cast(ubyte[])arr, newsize);
+    ubyte[] ret = pureRealloc(cast(ubyte[])arr, newsize);
 
     if(ret.ptr != cast(ubyte*)arr.ptr)
-        ret[0 .. oldsize] = cast(ubyte[])arr.ptr[0 .. oldsize];
+        ret[0 .. oldsize] = (cast(ubyte[])arr)[0 .. oldsize];
 
-    auto newdata = cast(void*) arr.ptr;
+    auto newdata = cast(void*) ret.ptr;
 
     // Handle initialization based on whether the type requires zero-init
     static if (__traits(isZeroInit, T))
