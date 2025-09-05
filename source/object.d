@@ -112,8 +112,15 @@ extern(C) void _d_array_slice_copy(void* dst, size_t dstlen, void* src, size_t s
     memcpy(dst, src, elemsz*dstlen);
 }
 
-void reserve(T)(ref T[] arr, size_t length) @trusted {
-	arr = (cast(T*) (malloc(length * T.sizeof).ptr))[0 .. 0];
+void reserve(T)(ref T[] arr, size_t length) @trusted 
+{
+    if(length <= arr.length)
+        return;
+    size_t oldLength = arr.length;
+    if(arr.ptr is null)
+	    arr = (cast(T*) (malloc(length * T.sizeof).ptr))[0 .. 0];
+    else
+	    arr = (cast(T*) (realloc(cast(ubyte*)arr.ptr, length * T.sizeof).ptr))[0 .. oldLength];
 }
 
 
