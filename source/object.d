@@ -304,7 +304,8 @@ else
 
 
 public import core.arsd.utf_decoding;
-public import core.internal.cast_v2111;
+public import core.internal.cast_;
+
 
 
 //WTF: Function needed there or else will get stripped
@@ -328,6 +329,14 @@ bool areClassInfosEqual(scope const TypeInfo_Class a, scope const TypeInfo_Class
 }
 
 //WTF: Function needed there or else will get stripped
+/*****
+* Dynamic cast from a class object o to class c, where c is a subclass of o.
+* Params:
+*      o = instance of class
+*      c = a subclass of o
+* Returns:
+*      null if o is null or c is not a subclass of o. Otherwise, return o.
+*/
 void* _d_class_cast_impl(const return scope Object o, const TypeInfo_Class c) pure nothrow @safe @nogc
 {
     if (!o)
@@ -359,9 +368,66 @@ void* _d_class_cast_impl(const return scope Object o, const TypeInfo_Class c) pu
     return null;
 }
 
+static if(__VERSION__ <= 2111)
+{
+
+    extern(C) void* _d_dynamic_cast(Object o, TypeInfo_Class c) {
+        void* res = null;
+        size_t offset = 0;
+        if (o && _d_isbaseof2(typeid(o), c, offset))
+        {
+            res = cast(void*) o + offset;
+        }
+        return res;
+    }
+
+    alias _d_class_cast = _d_class_cast_impl;
+
+    /*************************************
+    * Attempts to cast Object o to class c.
+    * Returns o if successful, null if not.
+    */
+    extern(C) void* _d_interface_cast(void* p, TypeInfo_Class c)
+    {
+        if (!p)
+            return null;
+
+        Interface* pi = **cast(Interface***) p;
+        return _d_dynamic_cast(cast(Object)(p - pi.offset), c);
+    }
 
 
-// }
+    extern(C)
+    int _d_isbaseof2(scope TypeInfo_Class oc, scope const TypeInfo_Class c, scope ref size_t offset) @safe
+
+    {
+        if (oc is c)
+            return true;
+
+        do
+        {
+            if (oc.base is c)
+                return true;
+
+            // Bugzilla 2013: Use depth-first search to calculate offset
+            // from the derived (oc) to the base (c).
+            foreach (iface; oc.interfaces)
+            {
+                if (iface.classinfo is c || _d_isbaseof2(iface.classinfo, c, offset))
+                {
+                    offset += iface.offset;
+                    return true;
+                }
+            }
+
+            oc = oc.base;
+        } while (oc);
+
+        return false;
+    }
+}
+
+
 
 version(CustomRuntimePrinter)
 {

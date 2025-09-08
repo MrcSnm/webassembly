@@ -1,6 +1,6 @@
-module core.internal.cast_v2111;
+module core.internal.cast_v2112;
 
-static if(__VERSION__ >= 2111):
+static if(__VERSION__ >= 2112):
 
 /*****
  * Dynamic cast from a class object `o` to class or interface `To`, where `To` is a subtype of `o`.

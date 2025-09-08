@@ -48,6 +48,27 @@ size_t _d_arraysetlengthT(Tarr : T[], T)(return ref scope Tarr arr, size_t newle
     return result;
 }
 
+template _d_arraysetlengthTImpl(Tarr : T[], T)
+{
+    private enum errorMessage = "Cannot resize arrays if compiling without support for runtime type information!";
+
+    /**
+     * Resize dynamic array
+     * Params:
+     *  arr = the array that will be resized, taken as a reference
+     *  newlength = new length of array
+     * Returns:
+     *  The new length of the array
+     * Bugs:
+     *   The safety level of this function is faked. It shows itself as `@trusted pure nothrow` to not break existing code.
+     */
+    size_t _d_arraysetlengthT(return scope ref Tarr arr, size_t newlength) @trusted pure nothrow
+    {
+        return ._d_arraysetlengthT(arr, newlength);
+    }
+
+}
+
 private size_t _d_arraysetlengthT_(Tarr : T[], T)(return ref scope Tarr arr, size_t newlength, bool isShared) @trusted pure
 {
     import core.checkedint : mulu;
@@ -58,7 +79,7 @@ private size_t _d_arraysetlengthT_(Tarr : T[], T)(return ref scope Tarr arr, siz
     import core.lifetime : emplace;
     import core.memory;
     import rt.hooks;
-    import core.internal.lifetime : __doPostblit;
+    import core.arsd.objectutils: __doPostblit;
     alias UnqT = Unqual!T;
 
     // If the new length is less than or equal to the current length, just truncate the array
