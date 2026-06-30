@@ -411,7 +411,7 @@ version(CustomRuntimePrinter)
 extern(C) void _d_assert(string file, uint line)  @trusted @nogc pure
 {
     version(WebAssembly)
-	    arsd.webassembly.eval(q{ console.error("Assert failure: " + $0 + ":" + $1); /*, "[" + $2 + ".." + $3 + "] <> " + $4);*/ }, file, line);//, lwr, upr, length);
+	    arsd.webassembly.eval(q{ console.error("Assert failure: file://" + $0 + ":" + $1); /*, "[" + $2 + ".." + $3 + "] <> " + $4);*/ }, file, line);//, lwr, upr, length);
     else version(CustomRuntimePrinter)
         customRuntimePrinter("Assert Failure: ", file, ":", line);
 	rt.hooks.abort();
@@ -422,7 +422,7 @@ void _d_assertp(immutable(char)* file, uint line)
     size_t sz = 0;
     while(file[sz] != '\0') sz++;
     version(WebAssembly)
-        arsd.webassembly.eval(q{ console.error("Assert failure: " + $0 + ":" + $1 + "(" + $2 + ")"); /*, "[" + $2 + ".." + $3 + "] <> " + $4);*/ }, file[0 .. sz], line);//, lwr, upr, length);
+        arsd.webassembly.eval(q{ console.error("Assert failure: file://" + $0 + ":" + $1 + "(" + $2 + ")"); /*, "[" + $2 + ".." + $3 + "] <> " + $4);*/ }, file[0 .. sz], line);//, lwr, upr, length);
     else version(CustomRuntimePrinter)
         customRuntimePrinter("Assert Failure: ", file[0..sz], ":", line);
 	rt.hooks.abort();
@@ -432,7 +432,7 @@ void _d_assertp(immutable(char)* file, uint line)
 extern(C) void _d_assert_msg(string msg, string file, uint line) @trusted @nogc pure
 {
     version(WebAssembly)
-	    arsd.webassembly.eval(q{ console.error("Assert failure: " + $0 + ":" + $1 + "(" + $2 + ")"); /*, "[" + $2 + ".." + $3 + "] <> " + $4);*/ }, file, line, msg);//, lwr, upr, length);
+	    arsd.webassembly.eval(q{ console.error("Assert failure: file://" + $0 + ":" + $1 + "(" + $2 + ")"); /*, "[" + $2 + ".." + $3 + "] <> " + $4);*/ }, file, line, msg);//, lwr, upr, length);
     else version(CustomRuntimePrinter)
         customRuntimePrinter("Assert Failure: ", file, ":", line, " (", msg, ")");
 	rt.hooks.abort();
