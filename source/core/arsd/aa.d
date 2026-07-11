@@ -7,6 +7,7 @@
  * Source: $(DRUNTIMESRC rt/_aaA.d)
  */
 module core.arsd.aa;
+static if(__VERSION__ <= 2111):
 
 /// AA version for debuggers, bump whenever changing the layout
 extern (C) immutable int _aaVersion = 1;

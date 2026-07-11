@@ -1091,50 +1091,57 @@ class TypeInfo_StaticArray : TypeInfo {
         arg1 = typeid(void*);
         return 0;
     }
-
 }
 
-import core.arsd.aa;
-alias AARange = core.arsd.aa.Range;
-extern (C)
+static if(__VERSION__ <= 2111)
 {
-    // from druntime/src/rt/aaA.d
-	/* The real type is (non-importable) `rt.aaA.Impl*`;
-		* the compiler uses `void*` for its prototypes.
-		*/
-	private alias AA = void*;
+    import core.arsd.aa;
+    alias AARange = core.arsd.aa.Range;
+    extern (C)
+    {
+        // from druntime/src/rt/aaA.d
+        /* The real type is (non-importable) `rt.aaA.Impl*`;
+            * the compiler uses `void*` for its prototypes.
+            */
+        private alias AA = void*;
 
-    // size_t _aaLen(in AA aa) pure nothrow @nogc;
-    private void* _aaGetY(scope AA* paa, const TypeInfo_AssociativeArray ti, const size_t valsz, const scope void* pkey) pure nothrow;
-    private void* _aaGetX(scope AA* paa, const TypeInfo_AssociativeArray ti, const size_t valsz, const scope void* pkey, out bool found) ;
-    // inout(void)* _aaGetRvalueX(inout AA aa, in TypeInfo keyti, in size_t valsz, in void* pkey);
-    inout(void[]) _aaValues(inout AA aa, const size_t keysz, const size_t valsz, const TypeInfo tiValueArray) ;
-    inout(void[]) _aaKeys(inout AA aa, const size_t keysz, const TypeInfo tiKeyArray) ;
-    void* _aaRehash(AA* paa, const scope TypeInfo keyti) ;
-    void _aaClear(AA aa) ;
+        // size_t _aaLen(in AA aa) pure nothrow @nogc;
+        private void* _aaGetY(scope AA* paa, const TypeInfo_AssociativeArray ti, const size_t valsz, const scope void* pkey) pure nothrow;
+        private void* _aaGetX(scope AA* paa, const TypeInfo_AssociativeArray ti, const size_t valsz, const scope void* pkey, out bool found) ;
+        // inout(void)* _aaGetRvalueX(inout AA aa, in TypeInfo keyti, in size_t valsz, in void* pkey);
+        inout(void[]) _aaValues(inout AA aa, const size_t keysz, const size_t valsz, const TypeInfo tiValueArray) ;
+        inout(void[]) _aaKeys(inout AA aa, const size_t keysz, const TypeInfo tiKeyArray) ;
+        void* _aaRehash(AA* paa, const scope TypeInfo keyti) ;
+        void _aaClear(AA aa) ;
 
-    // alias _dg_t = extern(D) int delegate(void*);
-    // int _aaApply(AA aa, size_t keysize, _dg_t dg);
+        // alias _dg_t = extern(D) int delegate(void*);
+        // int _aaApply(AA aa, size_t keysize, _dg_t dg);
 
-    // alias _dg2_t = extern(D) int delegate(void*, void*);
-    // int _aaApply2(AA aa, size_t keysize, _dg2_t dg);
+        // alias _dg2_t = extern(D) int delegate(void*, void*);
+        // int _aaApply2(AA aa, size_t keysize, _dg2_t dg);
 
-    AARange _aaRange(AA aa) pure nothrow @nogc @safe;
-    bool _aaRangeEmpty(AARange r) pure @safe @nogc nothrow;
-    void* _aaRangeFrontKey(AARange r) pure @safe @nogc nothrow;
-    void* _aaRangeFrontValue(AARange r) pure @nogc nothrow;
-    void _aaRangePopFront(ref AARange r) pure @nogc nothrow @safe;
+        AARange _aaRange(AA aa) pure nothrow @nogc @safe;
+        bool _aaRangeEmpty(AARange r) pure @safe @nogc nothrow;
+        void* _aaRangeFrontKey(AARange r) pure @safe @nogc nothrow;
+        void* _aaRangeFrontValue(AARange r) pure @nogc nothrow;
+        void _aaRangePopFront(ref AARange r) pure @nogc nothrow @safe;
 
-    int _aaEqual(scope const TypeInfo tiRaw, scope const AA aa1, scope const AA aa2);
-    size_t _aaGetHash(scope const AA* aa, scope const TypeInfo tiRaw) nothrow;
+        int _aaEqual(scope const TypeInfo tiRaw, scope const AA aa1, scope const AA aa2);
+        size_t _aaGetHash(scope const AA* aa, scope const TypeInfo tiRaw) nothrow;
 
-    /*
-        _d_assocarrayliteralTX marked as pure, because aaLiteral can be called from pure code.
-        This is a typesystem hole, however this is existing hole.
-        Early compiler didn't check purity of toHash or postblit functions, if key is a UDT thus
-        copiler allowed to create AA literal with keys, which have impure unsafe toHash methods.
-    */
-    void* _d_assocarrayliteralTX(const TypeInfo_AssociativeArray ti, void[] keys, void[] values);
+        /*
+            _d_assocarrayliteralTX marked as pure, because aaLiteral can be called from pure code.
+            This is a typesystem hole, however this is existing hole.
+            Early compiler didn't check purity of toHash or postblit functions, if key is a UDT thus
+            copiler allowed to create AA literal with keys, which have impure unsafe toHash methods.
+        */
+        void* _d_assocarrayliteralTX(const TypeInfo_AssociativeArray ti, void[] keys, void[] values);
+    }
+}
+else
+{
+    public import core.arsd.template_aa : _d_aaIn, _d_aaDel, _d_aaNew, _d_aaEqual, _d_assocarrayliteralTX, _aaGetHash;
+    public import core.arsd.template_aa : _d_aaLen, _d_aaGetY, _d_aaGetRvalueX, _d_aaApply, _d_aaApply2, AARange;
 }
 
 private AARange _aaToRange(T: V[K], K, V)(ref T aa) pure nothrow @nogc @safe
@@ -1374,15 +1381,43 @@ class TypeInfo_AssociativeArray : TypeInfo
                     this.value == c.value;
     }
 
-    override bool equals(in void* p1, in void* p2) @trusted const
+    TypeInfo value;
+    TypeInfo key;
+    TypeInfo entry;
+    
+
+
+    static if(__VERSION__>= 2112)
     {
-        return !!_aaEqual(this, *cast(const AA*) p1, *cast(const AA*) p2);
+        alias aaOpEqual(K, V) = core.arsd.template_aa._aaOpEqual!(K, V);
+        alias aaGetHash(K, V) = core.arsd.template_aa._aaGetHash!(K, V);
+        override bool equals(in void* p1, in void* p2) @trusted const
+        {
+            return xopEquals(p1, p2);
+        }
+
+        override size_t getHash(scope const void* p) nothrow @trusted const
+        {
+            return xtoHash(p);
+        }
+        bool function(scope const void* p1, scope const void* p2) nothrow @safe xopEquals;
+        hash_t function(scope const void*) nothrow @safe xtoHash;
+    }
+    else
+    {
+        override bool equals(in void* p1, in void* p2) @trusted const
+        {
+            return !!_aaEqual(this, *cast(const AA*) p1, *cast(const AA*) p2);
+        }
+
+        override size_t getHash(scope const void* p) nothrow @trusted const
+        {
+            return _aaGetHash(cast(AA*)p, this);
+        }
     }
 
-    override size_t getHash(scope const void* p) nothrow @trusted const
-    {
-        return _aaGetHash(cast(AA*)p, this);
-    }
+
+
 
     // BUG: need to add the rest of the functions
 
@@ -1398,11 +1433,6 @@ class TypeInfo_AssociativeArray : TypeInfo
 
     override @property inout(TypeInfo) next() nothrow pure inout { return value; }
     override @property uint flags() nothrow pure const { return 1; }
-
-
-    TypeInfo value;
-    TypeInfo key;
-    TypeInfo entry;
 
     override @property size_t talign() nothrow pure const
     {

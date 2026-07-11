@@ -17,6 +17,7 @@
 		"source/rt/tls_armeabi.d",
 		"source/object.d",
 		"source/core/arsd/aa.d",
+		"source/core/arsd/template_aa",
 		"source/core/arsd/objectutils.d",
 		"source/core/arsd/utf_decoding.d",
 		"source/core/internal/utf.d"
