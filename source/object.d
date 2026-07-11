@@ -8,11 +8,33 @@ version(WebAssembly)
 public import core.internal.hash : hashOf;
 
 version(PSVita) version = CustomRuntimePrinter;
+version(NintendoSwitch) version = CustomRuntimePrinter;
 version(CustomRuntimeTest) version = CustomRuntimePrinter;
 
 version(CarelessAlocation)
 {
 	version = inline_concat;
+}
+
+
+version (GNU)
+{
+    // No TypeInfo-based core.vararg.va_arg().
+}
+else version (X86_64)
+{
+    version (DigitalMars) version = WithArgTypes;
+    else version (Windows) { /* no need for Win64 ABI */ }
+    else version = WithArgTypes;
+}
+else version (AArch64)
+{
+    // Apple uses a trivial varargs implementation
+    version (OSX) {}
+    else version (iOS) {}
+    else version (TVOS) {}
+    else version (WatchOS) {}
+    else version = WithArgTypes;
 }
 
 alias noreturn = typeof(*null);
@@ -835,8 +857,16 @@ class TypeInfo
 	@property size_t talign() nothrow pure const { return size; }
     /** Return info used by the garbage collector to do precise collection.
      */
-    @property immutable(void)* rtInfo() nothrow pure const @trusted @nogc { return rtinfoHasPointers; } // better safe than sorry
+    @property immutable(void)* rtInfo() nothrow pure const @trusted @nogc { return rtinfoHasPointers; } // better safe than sorry}
+
+    version (WithArgTypes) int argTypes(out TypeInfo arg1, out TypeInfo arg2) @safe nothrow
+    {
+        arg1 = this;
+        return 0;
+    }
 }
+
+
 
 class TypeInfo_Class : TypeInfo
 {
@@ -1016,10 +1046,21 @@ class TypeInfo_Array : TypeInfo {
         return (void[]).alignof;
     }
 	override const(void)[] initializer() const @trusted { return (cast(void *)null)[0 ..  (void[]).sizeof]; }
+
+    version (WithArgTypes) override int argTypes(out TypeInfo arg1, out TypeInfo arg2)
+    {
+        arg1 = typeid(size_t);
+        arg2 = typeid(void*);
+        return 0;
+    }
 }
 class TypeInfo_Tuple : TypeInfo
 {
     TypeInfo[] elements;
+    version (WithArgTypes) override int argTypes(out TypeInfo arg1, out TypeInfo arg2)
+    {
+        assert(0);
+    }
 }
 
 class TypeInfo_StaticArray : TypeInfo {
@@ -1043,6 +1084,12 @@ class TypeInfo_StaticArray : TypeInfo {
 	override @property size_t talign() nothrow pure const
     {
         return value.talign;
+    }
+
+    version (WithArgTypes) override int argTypes(out TypeInfo arg1, out TypeInfo arg2)
+    {
+        arg1 = typeid(void*);
+        return 0;
     }
 
 }
@@ -1388,6 +1435,11 @@ class TypeInfo_Enum : TypeInfo {
         return m_init.length ? m_init : base.initializer();
     }
     override string toString() const pure { return name; }
+
+    version (WithArgTypes) override int argTypes(out TypeInfo arg1, out TypeInfo arg2)
+    {
+        return base.argTypes(arg1, arg2);
+    }
 }
 
 
@@ -1899,6 +1951,13 @@ class TypeInfo_Delegate : TypeInfo {
         alias dg = int delegate();
         return dg.alignof;
     }
+
+    version (WithArgTypes) override int argTypes(out TypeInfo arg1, out TypeInfo arg2)
+    {
+        arg1 = typeid(void*);
+        arg2 = typeid(void*);
+        return 0;
+    }
 }
 
 
@@ -1963,6 +2022,11 @@ class TypeInfo_Const : TypeInfo {
 
         auto t = cast(TypeInfo_Const)o;
         return base.opEquals(t.base);
+    }
+
+    version (WithArgTypes) override int argTypes(out TypeInfo arg1, out TypeInfo arg2)
+    {
+        return base.argTypes(arg1, arg2);
     }
 
 }
@@ -2032,6 +2096,19 @@ class TypeInfo_Struct : TypeInfo {
 	}
 	void function(void*) xpostblit;
 	uint align_;
+
+    version (WithArgTypes)
+    {
+        override int argTypes(out TypeInfo arg1, out TypeInfo arg2)
+        {
+            arg1 = m_arg1;
+            arg2 = m_arg2;
+            return 0;
+        }
+        TypeInfo m_arg1;
+        TypeInfo m_arg2;
+    }
+
 	immutable(void)* rtinfo;
     private struct _memberFunc //? Is it necessary
     {

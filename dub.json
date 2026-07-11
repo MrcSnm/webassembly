@@ -1,0 +1,45 @@
+{
+	"name": "runtime",
+	"license": "proprietary",
+	"description": "Provides a working D-runtime for WebAssembly, PSVita and maybe other bare-metal .",
+	"targetType": "staticLibrary",
+	"versions": ["CarelessAlocation"],
+	"copyright": "Copyright © 2023, Hipreme",
+	"authors": ["Hipreme", "Adam Ruppe"],
+	"importPaths": ["source"],
+    "sourcePaths": [],
+	"sourceFiles": [
+		"source/rt/hooks.d",
+		"source/core/arsd/memory_allocation.d",
+		"source/core/array/v2102.d",
+		"source/core/array/common.d",
+		"source/core/array/v2099.d",
+		"source/rt/tls_armeabi.d",
+		"source/object.d",
+		"source/core/arsd/aa.d",
+		"source/core/arsd/objectutils.d",
+		"source/core/arsd/utf_decoding.d",
+		"source/core/internal/utf.d"
+	],
+
+	"subPackages": [
+		{
+			"name": "arsd-webassembly",
+			"sourceFiles": ["arsd-webassembly/arsd/webassembly.d", "source/core/walloc.d"],
+			"importPaths": ["arsd-webassembly/"]
+		}
+	],
+	"configurations": [
+		{
+			"name": "wasm",
+			"dependencies": {
+				"runtime:arsd-webassembly": "*"
+			},
+			"targetType": "staticLibrary",
+			"lflags": ["-allow-undefined"]
+		},
+		{
+			"name": "switch"
+		}
+	]
+}
