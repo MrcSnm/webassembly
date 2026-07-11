@@ -77,7 +77,6 @@ private size_t _d_arraysetlengthT_(Tarr : T[], T)(return ref scope Tarr arr, siz
     import core.stdc.string : memcpy, memset;
     import core.internal.traits : hasElaborateCopyConstructor, Unqual;
     import core.lifetime : emplace;
-    import core.memory;
     import rt.hooks;
     import core.arsd.objectutils: __doPostblit;
     alias UnqT = Unqual!T;
