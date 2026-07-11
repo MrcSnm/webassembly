@@ -25,6 +25,7 @@
 	"subPackages": [
 		{
 			"name": "arsd-webassembly",
+			"sourcePaths": [],
 			"sourceFiles": ["arsd-webassembly/arsd/webassembly.d", "source/core/walloc.d"],
 			"importPaths": ["arsd-webassembly/"]
 		}
