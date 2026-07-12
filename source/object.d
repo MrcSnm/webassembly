@@ -1144,36 +1144,140 @@ else
     public import core.arsd.template_aa : _d_aaLen, _d_aaGetY, _d_aaGetRvalueX, _d_aaApply, _d_aaApply2, AARange;
 }
 
-private AARange _aaToRange(T: V[K], K, V)(ref T aa) pure nothrow @nogc @safe
-{
-    // ensure we are dealing with a genuine AA.
-    static if (is(const(V[K]) == const(T)))
-        alias realAA = aa;
-    else
-        const(V[K]) realAA = aa;
-    return _aaRange(() @trusted { return *cast(AA*)&realAA; } ());
-}
 
-auto byKey(T : V[K], K, V)(T aa) pure nothrow @nogc @safe
+static if(__VERSION__ <= 2111)
 {
-    import core.internal.traits : substInout;
 
-    static struct Result
+    private AARange _aaToRange(T: V[K], K, V)(ref T aa) pure nothrow @nogc @safe
     {
-        AARange r;
-
-    pure nothrow @nogc:
-        @property bool empty()  @safe { return _aaRangeEmpty(r); }
-        @property ref front() @trusted
-        {
-            return *cast(substInout!K*) _aaRangeFrontKey(r);
-        }
-        void popFront() @safe { _aaRangePopFront(r); }
-        @property Result save() { return this; }
+        // ensure we are dealing with a genuine AA.
+        static if (is(const(V[K]) == const(T)))
+            alias realAA = aa;
+        else
+            const(V[K]) realAA = aa;
+        return _aaRange(() @trusted { return *cast(AA*)&realAA; } ());
     }
 
-    return Result(_aaToRange(aa));
+    auto byKey(T : V[K], K, V)(T aa) pure nothrow @nogc @safe
+    {
+        import core.internal.traits : substInout;
+
+        static struct Result
+        {
+            AARange r;
+
+        pure nothrow @nogc:
+            @property bool empty()  @safe { return _aaRangeEmpty(r); }
+            @property ref front() @trusted
+            {
+                return *cast(substInout!K*) _aaRangeFrontKey(r);
+            }
+            void popFront() @safe { _aaRangePopFront(r); }
+            @property Result save() { return this; }
+        }
+
+        return Result(_aaToRange(aa));
+    }
+
+    auto byValue(T : V[K], K, V)(T aa) pure nothrow @nogc @safe
+    {
+        import core.internal.traits : substInout;
+
+        static struct Result
+        {
+            AARange r;
+
+        pure nothrow @nogc:
+            @property bool empty() @safe { return _aaRangeEmpty(r); }
+            @property ref front() @trusted
+            {
+                return *cast(substInout!V*) _aaRangeFrontValue(r);
+            }
+            void popFront() @safe { _aaRangePopFront(r); }
+            @property Result save() { return this; }
+        }
+
+        return Result(_aaToRange(aa));
+    }
 }
+else
+{
+    private auto _aaToRange(K, V)(auto ref inout V[K] aa) @trusted
+    {
+        import core.internal.traits : substInout;
+        import core.arsd.template_aa:_aaRange;
+
+        alias K2 = substInout!K;
+        alias V2 = substInout!V;
+        auto aa2 = cast(V2[K2])aa;
+        return _aaRange(aa2);
+    }
+    auto byKey(T : V[K], K, V)(T aa) pure nothrow @nogc @safe
+    {
+        import core.internal.traits : substInout;
+
+        const(V[K]) aa2 = aa;
+
+        static struct Result
+        {
+            typeof(_aaToRange(aa2)) r;
+
+        pure nothrow @nogc:
+            @property bool empty()  @safe 
+            { 
+                import core.arsd.template_aa:_aaRangeEmpty;
+                return _aaRangeEmpty(r); 
+            }
+            @property ref front() @trusted
+            {
+                import core.arsd.template_aa:_aaRangeFrontKey;
+                return *cast(substInout!K*)_aaRangeFrontKey(r);
+            }
+            void popFront() @safe 
+            { 
+                import core.arsd.template_aa:_aaRangePopFront;
+                _aaRangePopFront(r); 
+            }
+            @property Result save() { return this; }
+        }
+
+        return Result(_aaToRange(aa2));
+    }
+
+    auto byValue(T : V[K], K, V)(T aa) pure nothrow @nogc @safe
+    {
+        import core.internal.traits : substInout;
+
+        const(V[K]) aa2 = aa;
+
+        static struct Result
+        {
+            typeof(_aaToRange(aa2)) r;
+
+        pure nothrow @nogc:
+            @property bool empty() @safe 
+            { 
+                import core.arsd.template_aa:_aaRangeEmpty;
+                return _aaRangeEmpty(r); 
+            }
+            @property ref front() @trusted
+            {
+                import core.arsd.template_aa:_aaRangeFrontValue;
+                return *cast(substInout!V*)_aaRangeFrontValue(r);
+            }
+            void popFront() @safe 
+            { 
+                import core.arsd.template_aa:_aaRangePopFront;
+                _aaRangePopFront(r); 
+            }
+            @property Result save() { return this; }
+        }
+
+        return Result(_aaToRange(aa2));
+    }
+
+}
+
 
 /** ditto */
 auto byKey(T : V[K], K, V)(T* aa) pure nothrow @nogc
@@ -1182,48 +1286,37 @@ auto byKey(T : V[K], K, V)(T* aa) pure nothrow @nogc
 }
 
 
-
-auto byValue(T : V[K], K, V)(T aa) pure nothrow @nogc @safe
-{
-    import core.internal.traits : substInout;
-
-    static struct Result
-    {
-        AARange r;
-
-    pure nothrow @nogc:
-        @property bool empty() @safe { return _aaRangeEmpty(r); }
-        @property ref front() @trusted
-        {
-            return *cast(substInout!V*) _aaRangeFrontValue(r);
-        }
-        void popFront() @safe { _aaRangePopFront(r); }
-        @property Result save() { return this; }
-    }
-
-    return Result(_aaToRange(aa));
-}
-
 /** ditto */
 auto byValue(T : V[K], K, V)(T* aa) pure nothrow @nogc
 {
     return (*aa).byValue();
 }
 
-Key[] keys(T : Value[Key], Value, Key)(T aa) @property
+static if(__VERSION__<= 2111)
 {
-    // ensure we are dealing with a genuine AA.
-    static if (is(const(Value[Key]) == const(T)))
-        alias realAA = aa;
-    else
-        const(Value[Key]) realAA = aa;
-    auto res = () @trusted {
-        auto a = cast(void[])_aaKeys(*cast(inout(AA)*)&realAA, Key.sizeof, typeid(Key[]));
-        return *cast(Key[]*)&a;
-    }();
-    static if (__traits(hasPostblit, Key))
-        _doPostblit(res);
-    return res;
+    Key[] keys(T : Value[Key], Value, Key)(T aa) @property
+    {
+        // ensure we are dealing with a genuine AA.
+        static if (is(const(Value[Key]) == const(T)))
+            alias realAA = aa;
+        else
+            const(Value[Key]) realAA = aa;
+        auto res = () @trusted {
+            auto a = cast(void[])_aaKeys(*cast(inout(AA)*)&realAA, Key.sizeof, typeid(Key[]));
+            return *cast(Key[]*)&a;
+        }();
+        static if (__traits(hasPostblit, Key))
+            _doPostblit(res);
+        return res;
+    }
+}
+else
+{
+    auto keys(T : Value[Key], Value, Key)(inout T aa) @property
+    {
+        import core.arsd.template_aa;
+        return _aaKeys!(Key, Value)(aa);
+    }
 }
 
 /** ditto */
@@ -1240,20 +1333,31 @@ Key[] keys(T : Value[Key], Value, Key)(T *aa) @property
  * Returns:
  *      A dynamic array containing a copy of the values.
  */
-Value[] values(T : Value[Key], Value, Key)(T aa) @property
+static if(__VERSION__<= 2111)
 {
-    // ensure we are dealing with a genuine AA.
-    static if (is(const(Value[Key]) == const(T)))
-        alias realAA = aa;
-    else
-        const(Value[Key]) realAA = aa;
-    auto res = () @trusted {
-        auto a = cast(void[])_aaValues(*cast(inout(AA)*)&realAA, Key.sizeof, Value.sizeof, typeid(Value[]));
-        return *cast(Value[]*)&a;
-    }();
-    static if (__traits(hasPostblit, Value))
-        _doPostblit(res);
-    return res;
+    Value[] values(T : Value[Key], Value, Key)(T aa) @property
+    {
+        // ensure we are dealing with a genuine AA.
+        static if (is(const(Value[Key]) == const(T)))
+            alias realAA = aa;
+        else
+            const(Value[Key]) realAA = aa;
+        auto res = () @trusted {
+            auto a = cast(void[])_aaValues(*cast(inout(AA)*)&realAA, Key.sizeof, Value.sizeof, typeid(Value[]));
+            return *cast(Value[]*)&a;
+        }();
+        static if (__traits(hasPostblit, Value))
+            _doPostblit(res);
+        return res;
+    }
+}
+else
+{
+    auto values (T : Value[Key], Value, Key)(inout T aa) @property
+    {
+        import core.arsd.template_aa;
+        return _aaValues!(Key, Value)(aa);
+    }
 }
 
 /** ditto */
@@ -1354,7 +1458,19 @@ void clear(Value, Key)(Value[Key]* aa)
 }
 void* aaLiteral(Key, Value)(Key[] keys, Value[] values) @trusted pure
 {
-    return _d_assocarrayliteralTX(typeid(Value[Key]), *cast(void[]*)&keys, *cast(void[]*)&values);
+    static if(__VERSION__ <= 2111)
+        return _d_assocarrayliteralTX(typeid(Value[Key]), *cast(void[]*)&keys, *cast(void[]*)&values);
+    else
+    {
+        return _d_assocarrayliteralTX(keys, values);
+    }
+}
+
+static if(__VERSION__ >= 2112)
+auto _aaAsStruct(K, V)(V[K] aa) @safe
+{
+    assert(__ctfe);
+    return makeAA!(K, V)(aa);
 }
 
 alias AssociativeArray(Key, Value) = Value[Key];
@@ -1389,6 +1505,7 @@ class TypeInfo_AssociativeArray : TypeInfo
 
     static if(__VERSION__>= 2112)
     {
+        import core.arsd.template_aa;
         alias aaOpEqual(K, V) = core.arsd.template_aa._aaOpEqual!(K, V);
         alias aaGetHash(K, V) = core.arsd.template_aa._aaGetHash!(K, V);
         override bool equals(in void* p1, in void* p2) @trusted const
@@ -1814,6 +1931,18 @@ extern (C) void[] _d_arrayappendcd(ref byte[] x, dchar c)
     //
     return _d_arrayappendT(typeid(shared char[]), x, appendthis);
 }
+
+static if(__VERSION__ >= 2112)
+void* _d_arrayliteralTX(T)(size_t length) @trusted pure nothrow
+{
+    const allocsize = length * T.sizeof;
+
+    if (allocsize == 0)
+        return null;
+    else
+        return pureMalloc(allocsize).ptr;
+}
+
 
 
 
