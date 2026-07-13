@@ -7,7 +7,7 @@ version(NintendoSwitch) version = RuntimeHooks;
 version(WebAssembly)
 {
     public import core.arsd.memory_allocation;
-    void abort() pure nothrow @nogc
+    noreturn abort() pure nothrow @nogc
     {
         static import arsd.webassembly;
         arsd.webassembly.abort();
@@ -24,7 +24,7 @@ else version(RuntimeHooks)
         {
             extern(C) pure
             {
-                pragma(mangle, "psv_abort")  void hookAbort();
+                pragma(mangle, "psv_abort")  noreturn hookAbort();
                 pragma(mangle, "psv_free")  void hookFree(ubyte* ptr);
                 pragma(mangle, "sceClibPrintf")  int hookPrintf(const(char*) fmt, ...);
                 pragma(mangle,  "psv_realloc")  ubyte* hookRealloc(ubyte* ptr, size_t newSize);
@@ -38,8 +38,8 @@ else version(RuntimeHooks)
         {
             extern(C) @nogc nothrow
             {
-                pure void exit(int exitCode);
-                pure void hookAbort()
+                pure noreturn exit(int exitCode);
+                pure noreturn hookAbort()
                 {
                     // asm pure @nogc nothrow {int 3;}
                     exit(-1);
@@ -99,7 +99,7 @@ else version(RuntimeHooks)
                 return hookGetAllocatedMemory();
             }
 
-            void abort(){hookAbort();}
+            noreturn abort(){hookAbort();}
             void free(ubyte* ptr, string file, size_t line) @nogc
             {
                 hookFree(ptr);

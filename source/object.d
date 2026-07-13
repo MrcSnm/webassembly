@@ -97,7 +97,7 @@ void reserve(T)(ref T[] arr, size_t length) @trusted
 }
 
 
-extern(C) void _d_arraybounds(string file, size_t line) {
+extern(C) noreturn _d_arraybounds(string file, size_t line) {
 	
     version(WebAssembly)
         arsd.webassembly.eval(
@@ -110,7 +110,7 @@ extern(C) void _d_arraybounds(string file, size_t line) {
 
 
 /// Called when an out of range slice of an array is created
-extern(C) void _d_arraybounds_slice(string file, uint line, size_t lwr, size_t upr, size_t length)
+extern(C) noreturn _d_arraybounds_slice(string file, uint line, size_t lwr, size_t upr, size_t length)
 {
     version(WebAssembly)
         arsd.webassembly.eval(
@@ -122,7 +122,7 @@ extern(C) void _d_arraybounds_slice(string file, uint line, size_t lwr, size_t u
 }
 
 /// Called when an out of range array index is accessed
-extern(C) void _d_arraybounds_index(string file, uint line, size_t index, size_t length)
+extern(C) noreturn _d_arraybounds_index(string file, uint line, size_t index, size_t length)
 {
     version(WebAssembly)
         arsd.webassembly.eval(

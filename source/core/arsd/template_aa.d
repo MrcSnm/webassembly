@@ -569,27 +569,27 @@ V* _aaGetX(K, V, K2, V2)(auto ref scope V[K] a, auto ref K2 key, out bool found,
  * Returns:
  *      pointer to value if present, null otherwise
  */
-auto _d_aaGetRvalueX(K, V, K2)(inout V[K] aa, auto ref scope K2 key)
+auto _d_aaGetRvalueX(K, V)(inout V[K] aa, auto ref scope K key)
 {
     return _d_aaIn(aa, key);
 }
 
 /// ditto
-auto _d_aaGetRvalueX(K, V, K2)(shared(V[K]) aa, auto ref scope K2 key)
+auto _d_aaGetRvalueX(K, V)(shared(V[K]) aa, auto ref scope K key)
 {
     // accept shared for backward compatibility, should be deprecated
     return cast(shared(V)*)_d_aaIn(cast(V[K]) aa, key);
 }
 
 /// ditto
-auto _d_aaGetRvalueX(K, V, K2)(shared const(V[K]) aa, auto ref scope K2 key)
+auto _d_aaGetRvalueX(K, V)(shared const(V[K]) aa, auto ref scope K key)
 {
     // accept shared for backward compatibility, should be deprecated
     return cast(const shared(V)*)_d_aaIn(cast(V[K]) aa, key);
 }
 
 /// ditto
-auto _d_aaGetRvalueX(K, V, K2)(immutable(V[K]) aa, auto ref scope K2 key)
+auto _d_aaGetRvalueX(K, V)(immutable(V[K]) aa, auto ref scope K key)
 {
     // resolve ambiguity for immutable converting to const and shared const
     return _d_aaIn((() @trusted => cast(V[K]) aa) (), key);

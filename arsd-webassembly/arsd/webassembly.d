@@ -18,7 +18,7 @@ struct AcquireArgument {
 	extern(C) void retain(int);
 	extern(C) void release(int);
 	extern(C) int acquire(int returnType, string callingModuleName, string code, AcquireArgument[] arguments);
-	extern(C) void abort();
+	extern(C) noreturn abort();
 	extern(C) int monotimeNow();
 }
 
