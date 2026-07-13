@@ -655,9 +655,6 @@ auto _d_aaIn(T : V[K], K, V, K2)(shared T a, auto ref scope K2 key)
     return _d_aaIn(cast(V[K]) a, key);
 }
 
-// fake purity for backward compatibility with runtime hooks
-private extern(C) bool gc_inFinalizer() pure nothrow @safe;
-
 /// Delete entry scope const AA, return true if it was present
 auto _d_aaDel(T : V[K], K, V, K2)(T a, auto ref K2 key)
 {
@@ -677,7 +674,7 @@ auto _d_aaDel(T : V[K], K, V, K2)(T a, auto ref K2 key)
         ++aa.deleted;
         // `shrink` reallocates, and allocating from a finalizer leads to
         // InvalidMemoryError: https://issues.dlang.org/show_bug.cgi?id=21442
-        if (aa.length * SHRINK_DEN < aa.dim * SHRINK_NUM && !__ctfe && !gc_inFinalizer())
+        if (aa.length * SHRINK_DEN < aa.dim * SHRINK_NUM && !__ctfe)
             aa.shrink();
 
         return true;

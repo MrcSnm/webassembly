@@ -2788,5 +2788,4 @@ version(Emscripten)
 */
 enum immutable(void)* rtinfoNoPointers  = null;
 enum immutable(void)* rtinfoHasPointers = cast(void*)1;
-
 import core.internal.hash;
